@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Projectile Sandbox</title>
+<meta name="description" content="Interactive projectile motion sandbox. Change gravity, launch speed, angle and air resistance on Earth, Mars and the Moon.">
+<style>
+  :root{
+    --bg:#0a1a2e; --panel:#0f2440; --panel2:#15305a; --line:#21416b;
+    --text:#eef3fa; --mute:rgba(238,243,250,.58); --accent:#5db8ff;
+    --sans:"Avenir Next","Segoe UI Variable","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
+  }
+  body[data-world="mars"]{--bg:#1c0e0a;--panel:#2a1510;--panel2:#3a1f17;--line:#53301f;--accent:#ff8a57}
+  body[data-world="moon"]{--bg:#0d0e12;--panel:#16171d;--panel2:#20222a;--line:#30323d;--accent:#dfe3ee}
+
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--bg);color:var(--text);font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;
+    transition:background-color .5s;
+  }
+  .app{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:14px;padding:14px;height:100vh}
+
+  .stage{position:relative;border:1px solid var(--line);border-radius:16px;overflow:hidden;min-height:0;transition:border-color .5s}
+  canvas{width:100%;height:100%;display:block}
+
+  .hud{position:absolute;left:16px;top:14px;display:flex;gap:22px;flex-wrap:wrap;font-size:14px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.55);pointer-events:none}
+  .hud small{display:block;font-size:11px;color:rgba(255,255,255,.6);margin-bottom:1px}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px;overflow:auto;display:flex;flex-direction:column;gap:22px;transition:background-color .5s,border-color .5s}
+  h1{font-size:22px;margin:0;font-weight:700;letter-spacing:-.02em}
+  .sub{margin:5px 0 0;color:var(--mute);font-size:13px;line-height:1.4}
+  h2{font-size:13px;font-weight:600;margin:0 0 10px;color:var(--mute)}
+
+  .worlds{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .world{
+    appearance:none;font:inherit;color:var(--text);cursor:pointer;
+    background:var(--panel2);border:1.5px solid transparent;border-radius:12px;
+    padding:11px 6px 9px;display:flex;flex-direction:column;align-items:center;gap:3px;
+    transition:border-color .2s,background-color .2s;
+  }
+  .world:hover{border-color:var(--line)}
+  .world.active{border-color:var(--accent)}
+  .world i{width:22px;height:22px;border-radius:50%;display:block;margin-bottom:3px;box-shadow:inset -5px -5px 8px rgba(0,0,0,.35)}
+  .world b{font-size:14px;font-weight:600}
+  .world span{font-size:11px;color:var(--mute)}
+
+  .ctl{margin-bottom:15px}
+  .ctl:last-child{margin-bottom:0}
+  .row{display:flex;justify-content:space-between;align-items:baseline;font-size:14px;margin-bottom:8px}
+  .row output{font-weight:600}
+  input[type=range]{
+    -webkit-appearance:none;appearance:none;width:100%;height:6px;margin:0;border-radius:99px;outline:none;cursor:pointer;
+    background:linear-gradient(to right,var(--accent) var(--p,50%),rgba(255,255,255,.14) var(--p,50%));
+  }
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#fff;border:4px solid var(--accent)}
+  input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:#fff;border:4px solid var(--accent)}
+  input[type=range]:focus-visible{outline:2px solid var(--accent);outline-offset:5px}
+
+  .check{display:flex;align-items:center;gap:9px;font-size:14px;margin-top:16px;cursor:pointer}
+  .check input{accent-color:var(--accent);width:16px;height:16px;margin:0}
+
+  .actions{display:grid;grid-template-columns:1fr auto;gap:8px}
+  .btn{
+    appearance:none;font:inherit;font-weight:600;font-size:15px;cursor:pointer;border:0;border-radius:12px;padding:13px 18px;
+    background:var(--panel2);color:var(--text);transition:filter .15s,transform .05s;
+  }
+  .btn:hover{filter:brightness(1.18)}
+  .btn:active{transform:translateY(1px)}
+  .btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .btn.go{background:var(--accent);color:#08101a}
+
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .stat{background:var(--panel2);border-radius:12px;padding:11px 13px}
+  .stat small{display:block;font-size:12px;color:var(--mute);margin-bottom:2px}
+  .stat strong{font-size:18px;font-weight:650}
+  .note{font-size:13px;color:var(--mute);line-height:1.45;margin:10px 0 0;min-height:1.45em}
+  .fine{font-size:12px;color:var(--mute);line-height:1.5;margin:0}
+
+  @media (max-width:860px){
+    .app{grid-template-columns:1fr;height:auto}
+    .stage{height:58vh;min-height:320px}
+  }
+</style>
+</head>
+<body data-world="earth">
+<div class="app">
+  <section class="stage">
+    <canvas id="cv" aria-label="Projectile trajectory view"></canvas>
+    <div class="hud">
+      <div><small>World</small><span id="h-world">Earth</span></div>
+      <div><small>Time</small><span id="h-t">0.00 s</span></div>
+      <div><small>Distance</small><span id="h-x">0.0 m</span></div>
+      <div><small>Height</small><span id="h-y">0.0 m</span></div>
+      <div><small>Speed</small><span id="h-v">0.0 m/s</span></div>
+    </div>
+  </section>
+
+  <aside class="panel">
+    <div>
+      <h1>Projectile sandbox</h1>
+      <p class="sub">Pick a world, tweak the physics, and fire. The dashed line shows where your next shot will land.</p>
+    </div>
+
+    <div>
+      <h2>World</h2>
+      <div class="worlds" id="worlds"></div>
+    </div>
+
+    <div>
+      <h2>Launch settings</h2>
+      <div id="controls"></div>
+      <label class="check"><input type="checkbox" id="vac" checked> Compare with no air</label>
+    </div>
+
+    <div class="actions">
+      <button class="btn go" id="launch">Launch</button>
+      <button class="btn" id="clear">Clear</button>
+    </div>
+
+    <div>
+      <h2>Predicted shot</h2>
+      <div class="stats">
+        <div class="stat"><small>Range</small><strong id="s-range">–</strong></div>
+        <div class="stat"><small>Max height</small><strong id="s-max">–</strong></div>
+        <div class="stat"><small>Flight time</small><strong id="s-time">–</strong></div>
+        <div class="stat"><small>Impact speed</small><strong id="s-imp">–</strong></div>
+      </div>
+      <p class="note" id="note"></p>
+    </div>
+
+    <p class="fine">Drag is quadratic: a = −k·|v|·v. Mars has about 1–2% of Earth’s air density and the Moon has none, so the presets set k to match. Shortcuts: Space to launch, C to clear.</p>
+  </aside>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  /* ---------- Data ---------- */
+  const WORLDS = {
+    earth:{ name:'Earth', g:9.81, k:0.005,  dot:'#3c8fd9', skyTop:'#0b2545', skyBot:'#4a86bd', ground:'#24502f', edge:'#3f8a50', stars:0 },
+    mars: { name:'Mars',  g:3.71, k:0.0001, dot:'#d9623a', skyTop:'#2b1510', skyBot:'#c06a43', ground:'#6b3220', edge:'#9c4b2d', stars:0.25 },
+    moon: { name:'Moon',  g:1.62, k:0,      dot:'#b8bcc8', skyTop:'#000000', skyBot:'#0b0c12', ground:'#6c6d76', edge:'#a5a7b1', stars:1 }
+  };
+
+  const CONTROLS = [
+    { id:'g', label:'Gravity',        min:0.5, max:25,   step:0.01,   val:9.81,  fmt:v => v.toFixed(2)+' m/s²' },
+    { id:'v', label:'Launch speed',   min:1,   max:100,  step:1,      val:40,    fmt:v => v.toFixed(0)+' m/s' },
+    { id:'a', label:'Launch angle',   min:0,   max:90,   step:1,      val:45,    fmt:v => v.toFixed(0)+'°' },
+    { id:'k', label:'Air resistance', min:0,   max:0.03, step:0.0001, val:0.005, fmt:v => v === 0 ? 'None' : v.toFixed(4) },
+    { id:'h', label:'Launch height',  min:0,   max:100,  step:1,      val:0,     fmt:v => v.toFixed(0)+' m' },
+    { id:'s', label:'Playback speed', min:0.25,max:10,   step:0.25,   val:2,     fmt:v => v.toFixed(2).replace(/\.?0+$/,'')+'×' }
+  ];
+
+  const COLORS = ['#ffd166','#06d6a0','#ef476f','#4cc9f0','#c77dff','#ff9f1c','#b5e48c','#f72585'];
+  const MAX_SHOTS = 10;
+  const DT = 0.01;
+
+  const P = { g:9.81, v:40, a:45, k:0.005, h:0, s:2 };
+  let world = 'earth';
+  let showVac = true;
+  let dirty = true;
+  let preview = null, vacuum = null;
+  const shots = [];
+  let colorIdx = 0;
+
+  /* ---------- Physics ---------- */
+  function rk4(s, dt, k, g) {
+    const acc = (vx, vy) => { const sp = Math.hypot(vx, vy); return [-k*sp*vx, -g - k*sp*vy]; };
+    const [a1x,a1y] = acc(s.vx, s.vy);
+    const v2x = s.vx + a1x*dt/2, v2y = s.vy + a1y*dt/2; const [a2x,a2y] = acc(v2x, v2y);
+    const v3x = s.vx + a2x*dt/2, v3y = s.vy + a2y*dt/2; const [a3x,a3y] = acc(v3x, v3y);
+    const v4x = s.vx + a3x*dt,   v4y = s.vy + a3y*dt;   const [a4x,a4y] = acc(v4x, v4y);
+    s.x  += dt*(s.vx + 2*v2x + 2*v3x + v4x)/6;
+    s.y  += dt*(s.vy + 2*v2y + 2*v3y + v4y)/6;
+    s.vx += dt*(a1x + 2*a2x + 2*a3x + a4x)/6;
+    s.vy += dt*(a1y + 2*a2y + 2*a3y + a4y)/6;
+  }
+
+  function simulate(g, v, angleDeg, k, h) {
+    const r = angleDeg * Math.PI / 180;
+    const s = { x:0, y:h, vx:v*Math.cos(r), vy:v*Math.sin(r) };
+    const pts = [0, h];
+    let maxH = h, t = 0, n = 0, range = 0, impact = v;
+    while (n < 100000) {
+      const px = s.x, py = s.y;
+      rk4(s, DT, k, g); t += DT; n++;
+      if (s.y < 0) {
+        const f = py / (py - s.y);
+        s.x = px + (s.x - px) * f; s.y = 0; t -= DT * (1 - f);
+        pts.push(s.x, 0);
+        range = s.x; impact = Math.hypot(s.vx, s.vy);
+        break;
+      }
+      if (s.y > maxH) maxH = s.y;
+      if (n % 5 === 0) pts.push(s.x, s.y);
+      range = s.x;
+    }
+    return { pts, range, maxH, time:t, impact };
+  }
+
+  function refresh() {
+    preview = simulate(P.g, P.v, P.a, P.k, P.h);
+    vacuum  = simulate(P.g, P.v, P.a, 0, P.h);
+    $('s-range').textContent = fmtDist(preview.range);
+    $('s-max').textContent   = fmtDist(preview.maxH);
+    $('s-time').textContent  = fmtTime(preview.time);
+    $('s-imp').textContent   = preview.impact.toFixed(1) + ' m/s';
+    let note = '';
+    if (P.k === 0) note = 'No air: a clean parabola.';
+    else if (vacuum.range > 0.5) {
+      const cut = (1 - preview.range / vacuum.range) * 100;
+      note = cut < 0.5 ? 'Air barely changes this shot.' : `Air resistance cuts the range by ${cut.toFixed(cut < 10 ? 1 : 0)}%.`;
+    }
+    $('note').textContent = note;
+    dirty = false;
+  }
+
+  function launch() {
+    if (dirty) refresh();
+    const r = P.a * Math.PI / 180;
+    shots.push({
+      s:{ x:0, y:P.h, vx:P.v*Math.cos(r), vy:P.v*Math.sin(r) },
+      pts:[0, P.h], color:COLORS[colorIdx++ % COLORS.length],
+      k:P.k, g:P.g, t:0, acc:0, n:0, done:false,
+      range:0, maxH:P.h, pr:preview.range, ph:preview.maxH
+    });
+    if (shots.length > MAX_SHOTS) shots.shift();
+  }
+
+  function advance(simDt) {
+    for (const sh of shots) {
+      if (sh.done) continue;
+      sh.acc += simDt;
+      while (sh.acc >= DT && !sh.done) {
+        sh.acc -= DT;
+        const px = sh.s.x, py = sh.s.y;
+        rk4(sh.s, DT, sh.k, sh.g); sh.t += DT; sh.n++;
+        if (sh.s.y < 0) {
+          const f = py / (py - sh.s.y);
+          sh.s.x = px + (sh.s.x - px) * f; sh.s.y = 0; sh.t -= DT * (1 - f);
+          sh.pts.push(sh.s.x, 0);
+          sh.done = true; sh.range = sh.s.x;
+          break;
+        }
+        if (sh.s.y > sh.maxH) sh.maxH = sh.s.y;
+        if (sh.n % 2 === 0) sh.pts.push(sh.s.x, sh.s.y);
+      }
+    }
+  }
+
+  /* ---------- DOM helpers ---------- */
+  function $(id){ return document.getElementById(id); }
+  function fmtDist(m){ return m >= 1000 ? (m/1000).toFixed(2) + ' km' : m.toFixed(1) + ' m'; }
+  function fmtTime(s){ return s >= 100 ? s.toFixed(0) + ' s' : s.toFixed(2) + ' s'; }
+
+  const inputs = {};
+  CONTROLS.forEach(c => {
+    const d = document.createElement('div');
+    d.className = 'ctl';
+    d.innerHTML = `<div class="row"><label for="i-${c.id}">${c.label}</label><output id="o-${c.id}"></output></div>` +
+                  `<input type="range" id="i-${c.id}" min="${c.min}" max="${c.max}" step="${c.step}" value="${c.val}">`;
+    $('controls').appendChild(d);
+    const input = d.querySelector('input');
+    inputs[c.id] = { c, input, out:d.querySelector('output') };
+    input.addEventListener('input', () => setParam(c.id, parseFloat(input.value), true));
+  });
+
+  function setParam(id, val, fromUser) {
+    const { c, input, out } = inputs[id];
+    P[id] = val;
+    if (!fromUser) input.value = val;
+    out.textContent = c.fmt(val);
+    input.style.setProperty('--p', ((val - c.min) / (c.max - c.min) * 100) + '%');
+    if (id !== 's') dirty = true;
+    if (id === 'g' || id === 'k') syncWorldButtons();
+  }
+
+  const worldBtns = {};
+  Object.entries(WORLDS).forEach(([key, w]) => {
+    const b = document.createElement('button');
+    b.className = 'world';
+    b.innerHTML = `<i style="background:${w.dot}"></i><b>${w.name}</b><span>${w.g} m/s²</span>`;
+    b.addEventListener('click', () => setWorld(key));
+    $('worlds').appendChild(b);
+    worldBtns[key] = b;
+  });
+
+  function syncWorldButtons() {
+    for (const [key, w] of Object.entries(WORLDS)) {
+      worldBtns[key].classList.toggle('active', Math.abs(P.g - w.g) < 1e-6 && Math.abs(P.k - w.k) < 1e-9);
+    }
+  }
+
+  function setWorld(key) {
+    world = key;
+    document.body.dataset.world = key;
+    setParam('g', WORLDS[key].g, false);
+    setParam('k', WORLDS[key].k, false);
+    syncWorldButtons();
+  }
+
+  $('vac').addEventListener('change', e => { showVac = e.target.checked; });
+  $('launch').addEventListener('click', launch);
+  $('clear').addEventListener('click', () => { shots.length = 0; });
+  window.addEventListener('keydown', e => {
+    if (e.target.tagName === 'BUTTON') return;
+    if (e.code === 'Space') { e.preventDefault(); launch(); }
+    else if (e.code === 'KeyC') shots.length = 0;
+  });
+
+  /* ---------- Canvas ---------- */
+  const cv = $('cv');
+  const ctx = cv.getContext('2d');
+  let W = 0, H = 0, dpr = 1, scale = 0;
+
+  function resize() {
+    dpr = window.devicePixelRatio || 1;
+    const r = cv.getBoundingClientRect();
+    W = r.width; H = r.height;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  }
+  new ResizeObserver(resize).observe(cv.parentElement);
+
+  const stars = Array.from({ length:150 }, () => ({ x:Math.random(), y:Math.random(), r:0.4 + Math.random()*1.1, a:0.3 + Math.random()*0.7 }));
+
+  function niceStep(raw) {
+    const p = Math.pow(10, Math.floor(Math.log10(raw)));
+    const f = raw / p;
+    return (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10) * p;
+  }
+
+  function drawPath(pts, sx, sy, extra) {
+    ctx.beginPath();
+    ctx.moveTo(sx(pts[0]), sy(pts[1]));
+    for (let i = 2; i < pts.length; i += 2) ctx.lineTo(sx(pts[i]), sy(pts[i+1]));
+    if (extra) ctx.lineTo(sx(extra[0]), sy(extra[1]));
+    ctx.stroke();
+  }
+
+  function draw() {
+    if (!W) return;
+    const wd = WORLDS[world];
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const mL = 56, mR = 28, mT = 64, mB = 44;
+    const ox = mL, oy = H - mB;
+
+    // view bounds
+    let tx = preview.range, ty = Math.max(preview.maxH, P.h);
+    if (showVac) { tx = Math.max(tx, vacuum.range); ty = Math.max(ty, vacuum.maxH); }
+    for (const sh of shots) { tx = Math.max(tx, sh.pr, sh.range, sh.s.x); ty = Math.max(ty, sh.ph, sh.maxH); }
+    tx = Math.max(tx * 1.08, 10); ty = Math.max(ty * 1.15, 6);
+    const target = Math.min((W - mL - mR) / tx, (oy - mT) / ty);
+    scale = scale ? scale * Math.pow(target / scale, 0.12) : target;
+
+    const sx = x => ox + x * scale;
+    const sy = y => oy - y * scale;
+
+    // sky
+    const sky = ctx.createLinearGradient(0, 0, 0, oy);
+    sky.addColorStop(0, wd.skyTop); sky.addColorStop(1, wd.skyBot);
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+    if (wd.stars > 0) {
+      ctx.fillStyle = '#fff';
+      for (const s of stars) {
+        ctx.globalAlpha = s.a * wd.stars;
+        ctx.beginPath(); ctx.arc(s.x * W, s.y * oy, s.r, 0, 6.2832); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // grid
+    const step = niceStep(90 / scale);
+    ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255,255,255,.09)';
+    ctx.beginPath();
+    for (let x = 0; sx(x) < W; x += step) { ctx.moveTo(Math.round(sx(x)) + .5, mT - 20); ctx.lineTo(Math.round(sx(x)) + .5, oy); }
+    for (let y = step; sy(y) > mT - 20; y += step) { ctx.moveTo(ox, Math.round(sy(y)) + .5); ctx.lineTo(W, Math.round(sy(y)) + .5); }
+    ctx.stroke();
+
+    // ground
+    ctx.fillStyle = wd.ground; ctx.fillRect(0, oy, W, H - oy);
+    ctx.fillStyle = wd.edge; ctx.fillRect(0, oy, W, 2);
+
+    // labels
+    ctx.font = '12px system-ui, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,.75)';
+    ctx.textAlign = 'center';
+    for (let x = 0; sx(x) < W - 14; x += step) ctx.fillText(+x.toPrecision(4), sx(x), oy + 19);
+    ctx.textAlign = 'right';
+    for (let y = step; sy(y) > mT - 10; y += step) ctx.fillText(+y.toPrecision(4), ox - 8, sy(y) + 4);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = 'rgba(255,255,255,.5)';
+    ctx.fillText('meters', W - 10, oy + 36);
+
+    // vacuum ghost
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    if (showVac && P.k > 0) {
+      ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.lineWidth = 1.5; ctx.setLineDash([2, 6]);
+      drawPath(vacuum.pts, sx, sy);
+    }
+    // preview
+    ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--accent').trim() || '#fff';
+    ctx.globalAlpha = 0.85; ctx.lineWidth = 2; ctx.setLineDash([9, 7]);
+    drawPath(preview.pts, sx, sy);
+    ctx.globalAlpha = 1; ctx.setLineDash([]);
+
+    // trails
+    shots.forEach((sh, i) => {
+      const age = shots.length - 1 - i;
+      ctx.globalAlpha = Math.max(0.35, 1 - age * 0.09);
+      ctx.strokeStyle = sh.color; ctx.lineWidth = 2.5;
+      drawPath(sh.pts, sx, sy, sh.done ? null : [sh.s.x, sh.s.y]);
+      ctx.globalAlpha = 1;
+      if (sh.done) {
+        ctx.fillStyle = sh.color;
+        ctx.beginPath(); ctx.arc(sx(sh.range), oy, 4, 0, 6.2832); ctx.fill();
+        if (i === shots.length - 1) {
+          ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.font = '600 12px system-ui, sans-serif';
+          ctx.fillText(fmtDist(sh.range), Math.min(Math.max(sx(sh.range), 40), W - 40), oy - 12);
+        }
+      }
+    });
+
+    // tower + cannon
+    if (P.h > 0) {
+      ctx.fillStyle = 'rgba(255,255,255,.22)';
+      ctx.fillRect(ox - 8, sy(P.h), 16, oy - sy(P.h));
+    }
+    const ang = P.a * Math.PI / 180;
+    ctx.strokeStyle = '#dfe5ef'; ctx.lineWidth = 8; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(ox, sy(P.h)); ctx.lineTo(ox + Math.cos(ang) * 30, sy(P.h) - Math.sin(ang) * 30); ctx.stroke();
+    ctx.fillStyle = '#8c97aa';
+    ctx.beginPath(); ctx.arc(ox, sy(P.h), 9, 0, 6.2832); ctx.fill();
+
+    // balls + velocity arrows
+    for (const sh of shots) {
+      if (sh.done) continue;
+      const bx = sx(sh.s.x), by = sy(sh.s.y);
+      ctx.shadowColor = sh.color; ctx.shadowBlur = 14;
+      ctx.fillStyle = sh.color;
+      ctx.beginPath(); ctx.arc(bx, by, 6, 0, 6.2832); ctx.fill();
+      ctx.shadowBlur = 0;
+      const sp = Math.hypot(sh.s.vx, sh.s.vy);
+      if (sp > 0.01) {
+        const len = Math.min(56, sp * 0.8), ux = sh.s.vx / sp, uy = -sh.s.vy / sp;
+        const ex = bx + ux * len, ey = by + uy * len;
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(bx + ux * 8, by + uy * 8); ctx.lineTo(ex, ey);
+        ctx.lineTo(ex - ux * 6 - uy * 4, ey - uy * 6 + ux * 4);
+        ctx.moveTo(ex, ey); ctx.lineTo(ex - ux * 6 + uy * 4, ey - uy * 6 - ux * 4);
+        ctx.stroke();
+      }
+    }
+
+    updateHud();
+  }
+
+  function updateHud() {
+    $('h-world').textContent = WORLDS[world].name + ' · g ' + P.g.toFixed(2);
+    const sh = shots[shots.length - 1];
+    if (!sh) {
+      $('h-t').textContent = '0.00 s'; $('h-x').textContent = '0.0 m';
+      $('h-y').textContent = P.h.toFixed(1) + ' m'; $('h-v').textContent = P.v.toFixed(1) + ' m/s';
+      return;
+    }
+    $('h-t').textContent = fmtTime(sh.t);
+    $('h-x').textContent = fmtDist(sh.s.x);
+    $('h-y').textContent = fmtDist(Math.max(sh.s.y, 0));
+    $('h-v').textContent = Math.hypot(sh.s.vx, sh.s.vy).toFixed(1) + ' m/s';
+  }
+
+  /* ---------- Loop ---------- */
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    if (dirty) refresh();
+    advance(dt * P.s);
+    draw();
+    requestAnimationFrame(frame);
+  }
+
+  /* ---------- Init ---------- */
+  CONTROLS.forEach(c => setParam(c.id, c.val, false));
+  setWorld('earth');
+  refresh();
+  resize();
+  launch();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
