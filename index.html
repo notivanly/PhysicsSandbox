@@ -2,495 +2,994 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Projectile Sandbox</title>
-<meta name="description" content="Interactive projectile motion sandbox. Change gravity, launch speed, angle and air resistance on Earth, Mars and the Moon.">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Physics Sandbox | A 2D Physics Playground</title>
+<meta name="description" content="Build, drop, throw and connect objects in a 2D physics playground. Gravity, collisions, friction, springs and pendulums, powered by a custom rigid-body engine.">
+<meta name="theme-color" content="#0c0c0d">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23202123'/%3E%3Crect x='6' y='17' width='9' height='9' fill='none' stroke='%23fff' stroke-width='1.6' transform='rotate(-8 10 21)'/%3E%3Ccircle cx='21' cy='12' r='5' fill='%23ff4f2e'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@300;400;500;600&family=Martian+Mono:wght@400;500&display=swap" rel="stylesheet">
+
 <style>
-  :root{
-    --bg:#0a1a2e; --panel:#0f2440; --panel2:#15305a; --line:#21416b;
-    --text:#eef3fa; --mute:rgba(238,243,250,.58); --accent:#5db8ff;
-    --sans:"Avenir Next","Segoe UI Variable","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
-  }
-  body[data-world="mars"]{--bg:#1c0e0a;--panel:#2a1510;--panel2:#3a1f17;--line:#53301f;--accent:#ff8a57}
-  body[data-world="moon"]{--bg:#0d0e12;--panel:#16171d;--panel2:#20222a;--line:#30323d;--accent:#dfe3ee}
+/* ==========================================================================
+   Physics Sandbox
+   Same design system as the rest of the portfolio: graphite gradients, bone
+   white type, one signal red. Hanken Grotesk for copy, Martian Mono for data.
+   ========================================================================== */
+:root {
+  --bg: #0c0c0d; --ink: #f4f4f1; --ink-2: rgba(244,244,241,.68); --ink-3: rgba(244,244,241,.44);
+  --line: rgba(255,255,255,.15); --signal: #ff4f2e;
+  --frame: 10px; --pad: clamp(22px, 3.4vw, 52px); --colB: 26vw; --ease: cubic-bezier(.2,.7,.1,1);
+  --sans: "Hanken Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono: "Martian Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; background: var(--bg); -webkit-text-size-adjust: 100%; }
+body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 16px; line-height: 1.5; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+a { color: inherit; text-decoration: none; }
+ul, ol { list-style: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+::selection { background: var(--signal); color: #fff; }
+:focus-visible { outline: 2px solid #fff; outline-offset: 3px; border-radius: 3px; }
+.mono { font-family: var(--mono); }
+.skip { position: fixed; left: 12px; top: -60px; z-index: 100; background: #fff; color: #111; padding: .6rem 1rem; border-radius: 999px; font-size: .8rem; }
+.skip:focus { top: 12px; }
 
-  *{box-sizing:border-box}
-  html,body{margin:0;height:100%}
-  body{
-    background:var(--bg);color:var(--text);font-family:var(--sans);
-    -webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;
-    transition:background-color .5s;
-  }
-  .app{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:14px;padding:14px;height:100vh}
+/* header */
+.site-header { position: fixed; top: 0; left: 0; right: 0; z-index: 50; height: 96px; pointer-events: none; }
+.site-header::before { content: ""; position: absolute; inset: 0 0 -24px 0; z-index: -1; background: linear-gradient(to bottom, rgba(12,12,13,.8), rgba(12,12,13,0)); transition: opacity .5s ease; }
+.is-top .site-header::before { opacity: 0; }
+.site-header > * { pointer-events: auto; }
+.brand { position: absolute; left: calc(var(--frame) + var(--pad)); top: 30px; display: flex; flex-direction: column; gap: 5px; }
+.brand-name { font-weight: 600; font-size: .8125rem; letter-spacing: .1em; line-height: 1.1; }
+.brand-sub { font-size: .625rem; letter-spacing: .14em; font-weight: 500; opacity: .62; line-height: 1.1; }
+.nav { position: absolute; left: calc(var(--frame) + var(--colB)); top: 30px; display: flex; font-size: .8125rem; font-weight: 500; }
+.nav a { position: relative; opacity: .7; transition: opacity .25s ease; padding-bottom: 4px; }
+.nav a + a { margin-left: 1.9em; }
+.nav a + a::before { content: "/"; position: absolute; left: -1.25em; opacity: .45; }
+.nav a:hover, .nav a.is-active { opacity: 1; }
+.nav a.is-active::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: currentColor; }
+.pill { position: absolute; right: calc(var(--frame) + var(--pad)); top: 22px; padding: .68rem 1.15rem; font-size: .78rem; font-weight: 500; border: 1px solid rgba(255,255,255,.55); border-radius: 999px; background: rgba(255,255,255,.03); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); transition: background .3s ease, color .3s ease; }
+.pill:hover { background: #fff; color: #111; }
+.ico { width: .72rem; height: .72rem; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; margin-left: .35rem; }
 
-  .stage{position:relative;border:1px solid var(--line);border-radius:16px;overflow:hidden;min-height:0;transition:border-color .5s}
-  canvas{width:100%;height:100%;display:block}
+/* rail */
+.rail { position: fixed; right: calc(var(--frame) + 14px); top: 50%; transform: translateY(-50%); z-index: 40; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+.rail a { display: flex; align-items: center; gap: 10px; padding: 4px 0; }
+.rail .num { font-size: .58rem; opacity: 0; transform: translateX(6px); transition: opacity .4s ease, transform .5s var(--ease); }
+.rail i { display: block; width: 14px; height: 1px; background: rgba(255,255,255,.4); transition: width .5s var(--ease), background .3s ease; }
+.rail a.is-active .num { opacity: .9; transform: none; }
+.rail a.is-active i { width: 30px; background: #fff; }
 
-  .hud{position:absolute;left:16px;top:14px;display:flex;gap:22px;flex-wrap:wrap;font-size:14px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.55);pointer-events:none}
-  .hud small{display:block;font-size:11px;color:rgba(255,255,255,.6);margin-bottom:1px}
+/* slides */
+main { padding-top: var(--frame); }
+.slide { --g1: #5d5e61; --g2: #37383b; --g3: #18191b; --gx: 70%; --gy: 38%;
+  position: relative; isolation: isolate; overflow: hidden;
+  height: calc(100vh - 2 * var(--frame)); height: calc(100svh - 2 * var(--frame)); min-height: 740px;
+  margin: 0 var(--frame) var(--frame); border-radius: 24px;
+  background: radial-gradient(130% 110% at var(--gx) var(--gy), var(--g1) 0%, var(--g2) 46%, var(--g3) 100%);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
+.slide[data-tone="light"] { --g1: #77787b; --g2: #47484b; --g3: #1c1d1f; }
+.slide[data-tone="dark"] { --g1: #4d4e51; --g2: #2f3033; --g3: #151517; }
+.slide::after { content: ""; position: absolute; inset: 0; z-index: 6; pointer-events: none; opacity: .1; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.stage { position: absolute; inset: 0; z-index: 1; opacity: 0; }
+.slide.in .stage { opacity: 1; transition: opacity 1.2s ease; }
+.stage canvas { display: block; touch-action: none; }
+.index { position: absolute; z-index: 3; left: var(--pad); top: calc(14% - 28px); font-size: .72rem; letter-spacing: .04em; }
 
-  .panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px;overflow:auto;display:flex;flex-direction:column;gap:22px;transition:background-color .5s,border-color .5s}
-  h1{font-size:22px;margin:0;font-weight:700;letter-spacing:-.02em}
-  .sub{margin:5px 0 0;color:var(--mute);font-size:13px;line-height:1.4}
-  h2{font-size:13px;font-weight:600;margin:0 0 10px;color:var(--mute)}
+/* copy + type */
+.copy, .col { position: absolute; z-index: 3; left: var(--pad); top: 14%; width: clamp(250px, 26vw, 400px); }
+.col { bottom: 74px; overflow-y: auto; overflow-x: hidden; padding-right: 10px; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.25) transparent; }
+.title { font-weight: 500; font-size: clamp(1.5rem, 2.9vw, 3.3rem); line-height: 1.06; letter-spacing: .012em; }
+.line { display: block; overflow: hidden; padding: .06em 0; margin: -.06em 0; }
+.line > span { display: block; transform: translateY(112%); }
+.slide.in .line > span { transform: none; transition: transform 1.2s var(--ease); transition-delay: calc(var(--i, 0) * 100ms + 200ms); }
+.desc { margin-top: 1rem; max-width: 24rem; font-size: .82rem; line-height: 1.65; color: var(--ink-2); }
+.label { margin-top: 1.1rem; font-size: .72rem; color: var(--ink-3); }
+[data-r] { opacity: 0; }
+.slide.in [data-r] { opacity: 1; transition: opacity 1s ease calc(var(--d, 0) * 1ms + 300ms); }
+.bench .title { font-size: clamp(1.5rem, 2.5vw, 2.8rem); }
 
-  .worlds{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-  .world{
-    appearance:none;font:inherit;color:var(--text);cursor:pointer;
-    background:var(--panel2);border:1.5px solid transparent;border-radius:12px;
-    padding:11px 6px 9px;display:flex;flex-direction:column;align-items:center;gap:3px;
-    transition:border-color .2s,background-color .2s;
-  }
-  .world:hover{border-color:var(--line)}
-  .world.active{border-color:var(--accent)}
-  .world i{width:22px;height:22px;border-radius:50%;display:block;margin-bottom:3px;box-shadow:inset -5px -5px 8px rgba(0,0,0,.35)}
-  .world b{font-size:14px;font-weight:600}
-  .world span{font-size:11px;color:var(--mute)}
+.foot { position: absolute; z-index: 4; left: var(--pad); bottom: 26px; font-size: .8rem; font-weight: 500; }
+.cue { display: inline-flex; align-items: center; }
+.cue svg { width: .8rem; height: .8rem; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; margin-right: .55rem; animation: nudge 1.9s var(--ease) infinite; }
+@keyframes nudge { 0%, 100% { transform: translateY(-2px); } 50% { transform: translateY(3px); } }
 
-  .ctl{margin-bottom:15px}
-  .ctl:last-child{margin-bottom:0}
-  .row{display:flex;justify-content:space-between;align-items:baseline;font-size:14px;margin-bottom:8px}
-  .row output{font-weight:600}
-  input[type=range]{
-    -webkit-appearance:none;appearance:none;width:100%;height:6px;margin:0;border-radius:99px;outline:none;cursor:pointer;
-    background:linear-gradient(to right,var(--accent) var(--p,50%),rgba(255,255,255,.14) var(--p,50%));
-  }
-  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#fff;border:4px solid var(--accent)}
-  input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:#fff;border:4px solid var(--accent)}
-  input[type=range]:focus-visible{outline:2px solid var(--accent);outline-offset:5px}
+/* buttons */
+.btns { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .6rem; }
+.btn { padding: .45rem .85rem; font-size: .72rem; font-weight: 500; border: 1px solid rgba(255,255,255,.45); border-radius: 999px; transition: background .25s ease, color .25s ease, border-color .25s ease; }
+.btn:hover { background: #fff; color: #111; }
+.btn.primary { border-color: var(--signal); }
+.btn.primary:hover { background: var(--signal); border-color: var(--signal); color: #fff; }
+.btn[aria-pressed="true"] { background: #fff; color: #111; border-color: #fff; }
 
-  .check{display:flex;align-items:center;gap:9px;font-size:14px;margin-top:16px;cursor:pointer}
-  .check input{accent-color:var(--accent);width:16px;height:16px;margin:0}
+/* floating toolbar */
+.tools { position: absolute; z-index: 4; left: 31vw; right: calc(var(--pad) + 130px); top: 104px; display: flex; flex-wrap: wrap; justify-content: center; gap: .1rem; padding: .3rem; width: fit-content; margin: 0 auto; max-width: calc(69vw - var(--pad) - 130px); background: rgba(12,12,13,.52); border: 1px solid var(--line); border-radius: 22px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.tool { display: inline-flex; align-items: center; gap: .35rem; padding: .4rem .6rem; font-size: .68rem; font-weight: 500; border-radius: 999px; color: var(--ink-2); transition: background .2s ease, color .2s ease; white-space: nowrap; }
+.tool svg { width: .95rem; height: .95rem; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.tool:hover { color: #fff; background: rgba(255,255,255,.1); }
+.tool[aria-pressed="true"] { background: #fff; color: #111; }
+.tool.tog[aria-pressed="true"] { background: rgba(255,79,46,.9); color: #fff; }
+.tool.sep { margin-left: .4rem; position: relative; }
+.tool.sep::before { content: ""; position: absolute; left: -.3rem; top: 22%; bottom: 22%; width: 1px; background: var(--line); }
 
-  .actions{display:grid;grid-template-columns:1fr auto;gap:8px}
-  .btn{
-    appearance:none;font:inherit;font-weight:600;font-size:15px;cursor:pointer;border:0;border-radius:12px;padding:13px 18px;
-    background:var(--panel2);color:var(--text);transition:filter .15s,transform .05s;
-  }
-  .btn:hover{filter:brightness(1.18)}
-  .btn:active{transform:translateY(1px)}
-  .btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-  .btn.go{background:var(--accent);color:#08101a}
+/* controls */
+.controls { margin-top: .8rem; }
+.ctl { padding: .45rem 0 .5rem; border-top: 1px solid var(--line); }
+.ctl:last-of-type { border-bottom: 1px solid var(--line); }
+.ctl-top { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; margin-bottom: .25rem; }
+.ctl label { font-size: .74rem; color: var(--ink-2); }
+.num { width: 5.2rem; text-align: right; font-family: var(--mono); font-size: .72rem; font-weight: 500; color: var(--ink); background: transparent; border: 0; border-bottom: 1px solid transparent; padding: 0 0 1px; -moz-appearance: textfield; }
+.num::-webkit-outer-spin-button, .num::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.num:hover, .num:focus { border-bottom-color: var(--line); outline: none; }
+.rng { -webkit-appearance: none; appearance: none; width: 100%; height: 16px; background: transparent; cursor: pointer; }
+.rng::-webkit-slider-runnable-track { height: 1px; background: rgba(255,255,255,.4); }
+.rng::-moz-range-track { height: 1px; background: rgba(255,255,255,.4); }
+.rng::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -5.5px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 0 0 4px rgba(255,255,255,.12); transition: box-shadow .25s ease; }
+.rng::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 0 0 4px rgba(255,255,255,.12); }
+.rng:hover::-webkit-slider-thumb, .rng:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 7px rgba(255,255,255,.2); }
+.rng:focus-visible { outline: none; }
 
-  .stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .stat{background:var(--panel2);border-radius:12px;padding:11px 13px}
-  .stat small{display:block;font-size:12px;color:var(--mute);margin-bottom:2px}
-  .stat strong{font-size:18px;font-weight:650}
-  .note{font-size:13px;color:var(--mute);line-height:1.45;margin:10px 0 0;min-height:1.45em}
-  .fine{font-size:12px;color:var(--mute);line-height:1.5;margin:0}
+/* inspector */
+.inspect { margin-top: 1rem; padding-top: .7rem; border-top: 1px solid var(--line); font-size: .74rem; line-height: 1.6; color: var(--ink-2); }
+.inspect b { color: var(--ink); font-weight: 500; }
+.inspect .row { display: flex; justify-content: space-between; align-items: center; gap: .8rem; padding: .18rem 0; }
+.inspect .row span:first-child { color: var(--ink-3); }
+.inspect .num { width: 4.4rem; }
+.inspect .live { font-family: var(--mono); font-size: .66rem; color: var(--ink); }
+.inspect .rng { width: 7rem; }
 
-  @media (max-width:860px){
-    .app{grid-template-columns:1fr;height:auto}
-    .stage{height:58vh;min-height:320px}
-  }
+/* readouts */
+.hud { position: absolute; z-index: 4; right: var(--pad); bottom: 22px; display: flex; gap: clamp(16px, 2.2vw, 38px); padding-top: .8rem; border-top: 1px solid var(--line); }
+.hud > div { display: flex; flex-direction: column; gap: .3rem; }
+.hud dt { font-size: .66rem; line-height: 1.2; color: var(--ink-3); }
+.hud dd { font-family: var(--mono); font-size: .95rem; font-weight: 500; white-space: nowrap; }
+
+/* charts + engine */
+.charts { position: absolute; z-index: 3; left: 36vw; right: var(--pad); top: 12%; bottom: 8%; display: grid; grid-template-rows: 1fr 1fr; gap: 2.2rem; opacity: 0; }
+.slide.in .charts { opacity: 1; transition: opacity 1.2s ease .2s; }
+.charts figure { position: relative; min-height: 0; }
+.charts canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.charts figcaption { position: absolute; left: 0; top: 0; z-index: 1; font-size: .72rem; color: var(--ink-3); pointer-events: none; }
+.legend { display: flex; gap: 1.2rem; margin-top: 1.4rem; font-size: .72rem; color: var(--ink-2); }
+.legend i { display: inline-block; width: 18px; height: 3px; border-radius: 2px; margin-right: .5rem; vertical-align: middle; }
+.steps { position: absolute; z-index: 3; left: 36vw; right: var(--pad); top: 14%; display: grid; grid-template-columns: 1fr 1fr; gap: 0 3.2rem; }
+.step { padding: 1rem 0 1.15rem; border-top: 1px solid var(--line); }
+.step .n { font-family: var(--mono); font-size: .66rem; color: var(--signal); }
+.step b { display: block; font-weight: 500; font-size: .92rem; margin: .3rem 0 .5rem; }
+.step p { font-size: .76rem; line-height: 1.6; color: var(--ink-2); }
+.step code { font-family: var(--mono); font-size: .72rem; color: var(--ink); }
+.fine { position: absolute; z-index: 3; left: 36vw; right: var(--pad); bottom: 70px; font-size: .74rem; line-height: 1.65; color: var(--ink-2); max-width: 46rem; }
+.legal { position: absolute; z-index: 4; left: var(--pad); right: var(--pad); bottom: 24px; display: flex; justify-content: space-between; gap: 2rem; font-size: .7rem; color: var(--ink-3); }
+
+/* small screens */
+@media (max-width: 860px) {
+  :root { --colB: var(--pad); }
+  .nav, .rail { display: none; }
+  .slide { min-height: calc(100svh - 20px); height: auto; border-radius: 18px; padding-bottom: 80px; }
+  .copy, .col { position: relative; left: auto; top: auto; bottom: auto; width: auto; padding: 108px var(--pad) 0; overflow: visible; }
+  .index { top: 84px; }
+  .title, .bench .title { font-size: clamp(1.7rem, 8.6vw, 2.8rem); }
+  .bench { display: flex; flex-direction: column; }
+  .bench .col { display: contents; }
+  .bench .intro { order: 1; padding: 108px var(--pad) 0; }
+  .bench .scenes { order: 2; padding: 0 var(--pad); }
+  .bench .tools { position: relative; order: 3; left: auto; right: auto; top: auto; width: auto; max-width: none; margin: 1rem var(--pad) 0; justify-content: flex-start; }
+  .bench .stage { position: relative; order: 4; height: 64svh; min-height: 360px; margin-top: .6rem; opacity: 1; }
+  .bench .hud { position: relative; order: 5; right: auto; bottom: auto; margin: 1rem var(--pad) 0; flex-wrap: wrap; }
+  .bench .controls { order: 6; padding: 0 var(--pad); }
+  .bench .btns.actions { order: 7; padding: 0 var(--pad); }
+  .bench .inspect { order: 8; margin: 1rem var(--pad) 0; }
+  .foot { display: none; }
+  .charts, .steps, .fine { position: relative; left: auto; right: auto; top: auto; bottom: auto; margin: 1.6rem var(--pad) 0; }
+  .charts { grid-template-rows: none; gap: 1.2rem; }
+  .charts figure { height: 230px; }
+  .steps { grid-template-columns: 1fr; }
+  .legal { position: relative; left: auto; right: auto; bottom: auto; flex-direction: column; gap: .6rem; margin: 2rem var(--pad) 0; }
+}
+@media (max-width: 1180px) and (min-width: 861px) { .tool .t { display: none; } .tool { padding: .5rem .55rem; } .tools { right: calc(var(--pad) + 100px); } }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .stage, .charts, .line > span, [data-r] { opacity: 1 !important; transform: none !important; transition: none !important; }
+  .cue svg { animation: none; }
+}
 </style>
 </head>
-<body data-world="earth">
-<div class="app">
-  <section class="stage">
-    <canvas id="cv" aria-label="Projectile trajectory view"></canvas>
-    <div class="hud">
-      <div><small>World</small><span id="h-world">Earth</span></div>
-      <div><small>Time</small><span id="h-t">0.00 s</span></div>
-      <div><small>Distance</small><span id="h-x">0.0 m</span></div>
-      <div><small>Height</small><span id="h-y">0.0 m</span></div>
-      <div><small>Speed</small><span id="h-v">0.0 m/s</span></div>
+
+<body>
+<a class="skip" href="#sandbox">Skip to the sandbox</a>
+
+<header class="site-header">
+  <a class="brand" href="#home" aria-label="Physics Sandbox, back to top">
+    <span class="brand-name">PHYSICS SANDBOX</span>
+    <span class="brand-sub">A 2D PHYSICS PLAYGROUND</span>
+  </a>
+  <nav class="nav" aria-label="Sections">
+    <a href="#sandbox" data-nav="0">Sandbox</a>
+    <a href="#energy" data-nav="1">Energy</a>
+    <a href="#engine" data-nav="2">Engine</a>
+  </nav>
+  <a class="pill" href="https://github.com/notivanly/PhysicsSandbox" target="_blank" rel="noopener noreferrer">Source<svg class="ico" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 9l6-6M4 3h5v5"/></svg></a>
+</header>
+
+<aside class="rail" aria-label="Section progress">
+  <a href="#sandbox" data-rail="0" aria-label="Sandbox"><span class="num mono">001</span><i></i></a>
+  <a href="#energy" data-rail="1" aria-label="Energy"><span class="num mono">002</span><i></i></a>
+  <a href="#engine" data-rail="2" aria-label="Engine"><span class="num mono">003</span><i></i></a>
+</aside>
+
+<main id="home">
+  <!-- ===== 001 SANDBOX ===== -->
+  <section class="slide bench" id="sandbox" data-slide data-tone="light" style="--gx:64%; --gy:36%" aria-label="Physics sandbox">
+    <div class="stage"><canvas id="cv" aria-label="Physics sandbox canvas. Pointer-based: choose a tool in the toolbar, then click or drag in the scene. Energy and momentum readouts are listed below the scene."></canvas></div>
+    <p class="index mono"><span>001</span> / 003</p>
+
+    <div class="col">
+      <div class="intro">
+        <h1 class="title"><span class="line"><span style="--i:0">PHYSICS</span></span><span class="line"><span style="--i:1">SANDBOX</span></span></h1>
+        <p class="desc" data-r style="--d:450">Build, drop, throw and connect things. Gravity, collisions and momentum in an open-ended playground.</p>
+      </div>
+      <div class="scenes" data-r style="--d:560">
+        <p class="label">Scenes</p>
+        <div class="btns" id="scenes" role="group" aria-label="Scenes"></div>
+      </div>
+      <form class="controls" id="controls" aria-label="World settings" onsubmit="return false" data-r style="--d:650"></form>
+      <div class="btns" id="gpre" role="group" aria-label="Gravity presets" data-r style="--d:700"></div>
+      <div class="btns actions" data-r style="--d:760">
+        <button type="button" class="btn" id="bReset">Reset scene</button>
+        <button type="button" class="btn" id="bClear">Clear all</button>
+      </div>
+      <div class="inspect" id="inspect" aria-live="polite">Pick a tool, then click in the scene. Drag objects to throw them.</div>
+    </div>
+
+    <div class="tools" id="tools" role="toolbar" aria-label="Tools" data-r style="--d:600"></div>
+
+    <dl class="hud" id="hud">
+      <div><dt>Bodies</dt><dd id="hN">0</dd></div>
+      <div><dt>Kinetic energy</dt><dd id="hK">0 J</dd></div>
+      <div><dt>Potential energy</dt><dd id="hP">0 J</dd></div>
+      <div><dt>Total energy</dt><dd id="hT">0 J</dd></div>
+      <div><dt>Momentum</dt><dd id="hM">0</dd></div>
+    </dl>
+    <div class="foot"><a class="cue" href="#energy"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 2v8M2.5 6.5L6 10l3.5-3.5"/></svg>Scroll to explore</a></div>
+  </section>
+
+  <!-- ===== 002 ENERGY ===== -->
+  <section class="slide energy" id="energy" data-slide data-tone="dark" style="--gx:68%; --gy:36%" aria-label="Energy and momentum">
+    <p class="index mono"><span>002</span> / 003</p>
+    <div class="copy">
+      <h2 class="title"><span class="line"><span style="--i:0">ENERGY IN,</span></span><span class="line"><span style="--i:1">ENERGY OUT</span></span></h2>
+      <p class="desc" data-r style="--d:450">Drop something and watch potential energy turn into kinetic energy and back. With bounciness at 1 and no air drag the total stays flat. Anything less and every bounce leaks energy as heat.</p>
+      <p class="desc" data-r style="--d:520">In zero gravity, momentum is conserved in every collision, whatever the bounciness. Try two balls head-on.</p>
+      <div class="legend" data-r style="--d:600"><span><i style="background:#fff"></i>Kinetic</span><span><i style="background:rgba(255,255,255,.4)"></i>Potential</span><span><i style="background:var(--signal)"></i>Total</span></div>
+    </div>
+    <div class="charts" data-r style="--d:500">
+      <figure><figcaption>Energy over the last 20 seconds (joules)</figcaption><canvas id="chE" role="img" aria-label="Chart of kinetic, potential and total energy over time"></canvas></figure>
+      <figure><figcaption>Total momentum over the last 20 seconds (kg&middot;m/s)</figcaption><canvas id="chP" role="img" aria-label="Chart of total momentum over time"></canvas></figure>
     </div>
   </section>
 
-  <aside class="panel">
-    <div>
-      <h1>Projectile sandbox</h1>
-      <p class="sub">Pick a world, tweak the physics, and fire. The dashed line shows where your next shot will land.</p>
+  <!-- ===== 003 ENGINE ===== -->
+  <section class="slide engine" id="engine" data-slide data-tone="light" style="--gx:66%; --gy:40%" aria-label="How the engine works">
+    <p class="index mono"><span>003</span> / 003</p>
+    <div class="copy">
+      <h2 class="title"><span class="line"><span style="--i:0">A PHYSICS ENGINE,</span></span><span class="line"><span style="--i:1">FROM SCRATCH</span></span></h2>
+      <p class="desc" data-r style="--d:450">Everything here runs on a small rigid-body engine written for this page. No libraries. Each frame goes through the same four steps, several times over.</p>
     </div>
-
-    <div>
-      <h2>World</h2>
-      <div class="worlds" id="worlds"></div>
+    <div class="steps" data-r style="--d:500">
+      <article class="step"><span class="n">01</span><b>Integrate</b><p>Gravity and drag change each velocity, <code>v += g dt</code>, then positions move, <code>x += v dt</code>. Each frame is split into at least 4 smaller steps.</p></article>
+      <article class="step"><span class="n">02</span><b>Detect collisions</b><p>Circles use distance. Polygons use the separating axis test, then clip the touching edges to find up to two contact points.</p></article>
+      <article class="step"><span class="n">03</span><b>Solve contacts</b><p>Sequential impulses push bodies apart along the contact normal, with bounce <code>e</code> and a friction limit <code>&mu; N</code>. Impulses are remembered between steps so stacks stay still.</p></article>
+      <article class="step"><span class="n">04</span><b>Solve joints</b><p>Hinges pin points together. Rods hold a distance. Ropes only pull. Springs are soft constraints with a frequency and a damping ratio.</p></article>
     </div>
+    <p class="fine" data-r style="--d:700">Limits: 2D only, no sleeping, and no continuous collision detection, so very fast thin objects can tunnel through walls. Spring energy is not counted in the energy readouts. Not intended for engineering analysis.</p>
+    <div class="legal"><span>PHYSICS SANDBOX. Built for curiosity &amp; education.</span><span>Units: metres, kilograms, seconds. Mass density 1 kg/m&sup2; unless you change a mass.</span></div>
+  </section>
+</main>
 
-    <div>
-      <h2>Launch settings</h2>
-      <div id="controls"></div>
-      <label class="check"><input type="checkbox" id="vac" checked> Compare with no air</label>
-    </div>
-
-    <div class="actions">
-      <button class="btn go" id="launch">Launch</button>
-      <button class="btn" id="clear">Clear</button>
-    </div>
-
-    <div>
-      <h2>Predicted shot</h2>
-      <div class="stats">
-        <div class="stat"><small>Range</small><strong id="s-range">–</strong></div>
-        <div class="stat"><small>Max height</small><strong id="s-max">–</strong></div>
-        <div class="stat"><small>Flight time</small><strong id="s-time">–</strong></div>
-        <div class="stat"><small>Impact speed</small><strong id="s-imp">–</strong></div>
-      </div>
-      <p class="note" id="note"></p>
-    </div>
-
-    <p class="fine">Drag is quadratic: a = −k·|v|·v. Mars has about 1–2% of Earth’s air density and the Moon has none, so the presets set k to match. Shortcuts: Space to launch, C to clear.</p>
-  </aside>
-</div>
+<noscript><p style="position:fixed;inset:auto 0 0 0;z-index:200;padding:1rem;background:#fff;color:#111;text-align:center;font-size:.85rem">The sandbox needs JavaScript. Please enable it to play.</p></noscript>
 
 <script>
-(() => {
+(function () {
   'use strict';
+  var TAU = Math.PI * 2;
+  function clamp(v, a, b) { return Math.min(b, Math.max(a, v)); }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function W(a) { return 'rgba(255,255,255,' + a + ')'; }
+  function Ac(a) { return 'rgba(255,79,46,' + a + ')'; }
+  var MONO = '"Martian Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace';
+  var REDUCED = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  function $(s) { return document.querySelector(s); }
+  function $$(s) { return Array.prototype.slice.call(document.querySelectorAll(s)); }
+  function txt(c, s, x, y, size, col, al) { c.font = '500 ' + size + 'px ' + MONO; c.fillStyle = col; c.textAlign = al || 'left'; c.textBaseline = 'alphabetic'; c.fillText(s, x, y); }
+  function arrow(c, x1, y1, x2, y2, head) {
+    head = head || 6; var a = Math.atan2(y2 - y1, x2 - x1);
+    c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke();
+    c.beginPath(); c.moveTo(x2, y2); c.lineTo(x2 - head * Math.cos(a - .42), y2 - head * Math.sin(a - .42)); c.lineTo(x2 - head * Math.cos(a + .42), y2 - head * Math.sin(a + .42)); c.closePath(); c.fill();
+  }
+  function fN(v, d) { return v.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }).replace('-', '\u2212'); }
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 
-  /* ---------- Data ---------- */
-  const WORLDS = {
-    earth:{ name:'Earth', g:9.81, k:0.005,  dot:'#3c8fd9', skyTop:'#0b2545', skyBot:'#4a86bd', ground:'#24502f', edge:'#3f8a50', stars:0 },
-    mars: { name:'Mars',  g:3.71, k:0.0001, dot:'#d9623a', skyTop:'#2b1510', skyBot:'#c06a43', ground:'#6b3220', edge:'#9c4b2d', stars:0.25 },
-    moon: { name:'Moon',  g:1.62, k:0,      dot:'#b8bcc8', skyTop:'#000000', skyBot:'#0b0c12', ground:'#6c6d76', edge:'#a5a7b1', stars:1 }
-  };
+  /* ======================================================================
+     THE ENGINE
+     Rigid bodies (circles and convex polygons), contact manifolds from the
+     separating axis test, sequential-impulse solver with friction and
+     warm starting, and joints (hinge, rod, rope, spring).
+     Units: metres, kilograms, seconds. y points up.
+     ====================================================================== */
+  var Phys = (function () {
+    var BETA = 0.2, SLOP = 0.005, REST_THRESH = 1.0, MAXBIAS = 3, ITER = 14;
 
-  const CONTROLS = [
-    { id:'g', label:'Gravity',        min:0.5, max:25,   step:0.01,   val:9.81,  fmt:v => v.toFixed(2)+' m/s²' },
-    { id:'v', label:'Launch speed',   min:1,   max:100,  step:1,      val:40,    fmt:v => v.toFixed(0)+' m/s' },
-    { id:'a', label:'Launch angle',   min:0,   max:90,   step:1,      val:45,    fmt:v => v.toFixed(0)+'°' },
-    { id:'k', label:'Air resistance', min:0,   max:0.03, step:0.0001, val:0.005, fmt:v => v === 0 ? 'None' : v.toFixed(4) },
-    { id:'h', label:'Launch height',  min:0,   max:100,  step:1,      val:0,     fmt:v => v.toFixed(0)+' m' },
-    { id:'s', label:'Playback speed', min:0.25,max:10,   step:0.25,   val:2,     fmt:v => v.toFixed(2).replace(/\.?0+$/,'')+'×' }
+    function newWorld() {
+      var ground = { id: 0, ground: true, shape: null, x: 0, y: 0, a: 0, vx: 0, vy: 0, w: 0, im: 0, iI: 0, m: Infinity, I: Infinity, e: 0, mu: 0.5, static: true };
+      return { bodies: [], joints: [], arbs: {}, ground: ground, nextId: 1, gx: 0, gy: -9.81, drag: 0, angDrag: 0.02, time: 0, mouse: null, attractors: [], events: [], removed: 0 };
+    }
+    function setMassProps(b, m, I) {
+      b.m0 = m; b.I0 = I;
+      if (b.static) { b.m = Infinity; b.im = 0; b.I = Infinity; b.iI = 0; b.vx = b.vy = b.w = 0; }
+      else { b.m = m; b.im = 1 / m; b.I = I; b.iI = 1 / I; }
+    }
+    function mk(shape, x, y, m, I, o) {
+      var b = { shape: shape, x: x, y: y, a: o.angle || 0, vx: o.vx || 0, vy: o.vy || 0, w: o.w || 0, e: o.e != null ? o.e : 0.3, mu: o.mu != null ? o.mu : 0.5, static: !!o.static, hot: !!o.hot, trail: [], density: o.density || 1, wv: null, wn: null };
+      setMassProps(b, m, I); return b;
+    }
+    function circle(x, y, r, o) { o = o || {}; var d = o.density || 1, m = Math.PI * r * r * d; return mk({ type: 'circle', r: r, area: Math.PI * r * r }, x, y, m, 0.5 * m * r * r, o); }
+    function polygon(x, y, verts, o) {                         // verts: CCW [[x,y],...]
+      o = o || {}; var d = o.density || 1, n = verts.length, area = 0, cx = 0, cy = 0, i, a, b, cr;
+      for (i = 0; i < n; i++) { a = verts[i]; b = verts[(i + 1) % n]; cr = a[0] * b[1] - a[1] * b[0]; area += cr; cx += (a[0] + b[0]) * cr; cy += (a[1] + b[1]) * cr; }
+      area *= 0.5; cx /= 6 * area; cy /= 6 * area;
+      var v = [], nn = [], I = 0;
+      for (i = 0; i < n; i++) v.push({ x: verts[i][0] - cx, y: verts[i][1] - cy });
+      for (i = 0; i < n; i++) {
+        a = v[i]; b = v[(i + 1) % n]; cr = a.x * b.y - a.y * b.x; I += cr * (a.x * a.x + a.y * a.y + a.x * b.x + a.y * b.y + b.x * b.x + b.y * b.y);
+        var ex = b.x - a.x, ey = b.y - a.y, l = Math.hypot(ex, ey); nn.push({ x: ey / l, y: -ex / l });
+      }
+      var rmax = 0; v.forEach(function (p) { rmax = Math.max(rmax, Math.hypot(p.x, p.y)); });
+      return mk({ type: 'poly', v: v, n: nn, area: area, rmax: rmax }, x, y, area * d, I / 12 * d, o);
+    }
+    function box(x, y, w, h, o) { var hw = w / 2, hh = h / 2; return polygon(x, y, [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]], o); }
+    function regular(x, y, r, n, o) { var v = [], i; for (i = 0; i < n; i++) { var t = i / n * TAU + Math.PI / 2; v.push([r * Math.cos(t), r * Math.sin(t)]); } return polygon(x, y, v, o); }
+    function triangle(x, y, r, o) { return regular(x, y, r, 3, o); }
+
+    function updateGeom(b) {
+      var s = b.shape; if (!s) return; var c = Math.cos(b.a), sn = Math.sin(b.a), i;
+      if (s.type === 'circle') { b.minx = b.x - s.r; b.maxx = b.x + s.r; b.miny = b.y - s.r; b.maxy = b.y + s.r; return; }
+      var n = s.v.length;
+      if (!b.wv) { b.wv = []; b.wn = []; for (i = 0; i < n; i++) { b.wv.push({ x: 0, y: 0 }); b.wn.push({ x: 0, y: 0 }); } }
+      var mnx = 1e9, mxx = -1e9, mny = 1e9, mxy = -1e9;
+      for (i = 0; i < n; i++) {
+        var lv = s.v[i], ln = s.n[i], p = b.wv[i], q = b.wn[i];
+        p.x = b.x + c * lv.x - sn * lv.y; p.y = b.y + sn * lv.x + c * lv.y; q.x = c * ln.x - sn * ln.y; q.y = sn * ln.x + c * ln.y;
+        if (p.x < mnx) mnx = p.x; if (p.x > mxx) mxx = p.x; if (p.y < mny) mny = p.y; if (p.y > mxy) mxy = p.y;
+      }
+      b.minx = mnx; b.maxx = mxx; b.miny = mny; b.maxy = mxy;
+    }
+    function add(w, b) { b.id = w.nextId++; updateGeom(b); w.bodies.push(b); return b; }
+    function removeBody(w, b) {
+      var i = w.bodies.indexOf(b); if (i >= 0) w.bodies.splice(i, 1);
+      w.joints = w.joints.filter(function (j) { return j.A !== b && j.B !== b; });
+      if (w.mouse && w.mouse.body === b) w.mouse = null;
+    }
+    function setMass(b, m) { if (b.static || !(m > 0)) return; var k = m / b.m0; setMassProps(b, m, b.I0 * k); }
+    function setStatic(b, on) { b.static = !!on; setMassProps(b, b.m0, b.I0); if (on) { b.vx = b.vy = b.w = 0; } }
+
+    /* ---------- collision detection ---------- */
+    function ccManifold(A, C) {
+      var dx = C.x - A.x, dy = C.y - A.y, rr = A.shape.r + C.shape.r, d2 = dx * dx + dy * dy;
+      if (d2 > rr * rr) return null;
+      var d = Math.sqrt(d2), nx = 1, ny = 0; if (d > 1e-9) { nx = dx / d; ny = dy / d; }
+      var depth = rr - d;
+      return { nx: nx, ny: ny, pts: [{ x: A.x + nx * (A.shape.r - depth / 2), y: A.y + ny * (A.shape.r - depth / 2), d: depth }] };
+    }
+    function pcManifold(P, C) {                                 // normal points from polygon P to circle C
+      var n = P.shape.v.length, r = C.shape.r, cx = C.x, cy = C.y, i, best = -1e9, bi = 0;
+      for (i = 0; i < n; i++) {
+        var s = P.wn[i].x * (cx - P.wv[i].x) + P.wn[i].y * (cy - P.wv[i].y);
+        if (s > r) return null; if (s > best) { best = s; bi = i; }
+      }
+      var v1 = P.wv[bi], v2 = P.wv[(bi + 1) % n], nn = P.wn[bi];
+      if (best < 1e-9) { return { nx: nn.x, ny: nn.y, pts: [{ x: cx - nn.x * r, y: cy - nn.y * r, d: r - best }] }; }
+      var u1 = (cx - v1.x) * (v2.x - v1.x) + (cy - v1.y) * (v2.y - v1.y), u2 = (cx - v2.x) * (v1.x - v2.x) + (cy - v2.y) * (v1.y - v2.y), vx, vy;
+      if (u1 <= 0 || u2 <= 0) {
+        var vv = u1 <= 0 ? v1 : v2, dx = cx - vv.x, dy = cy - vv.y, d2 = dx * dx + dy * dy; if (d2 > r * r) return null;
+        var d = Math.sqrt(d2) || 1e-9; return { nx: dx / d, ny: dy / d, pts: [{ x: vv.x, y: vv.y, d: r - d }] };
+      }
+      return { nx: nn.x, ny: nn.y, pts: [{ x: cx - nn.x * (r + best) / 2, y: cy - nn.y * (r + best) / 2, d: r - best }] };
+    }
+    function maxSep(A, B) {
+      var na = A.shape.v.length, nb = B.shape.v.length, best = -1e9, bi = 0, i, j;
+      for (i = 0; i < na; i++) {
+        var nx = A.wn[i].x, ny = A.wn[i].y, vx = A.wv[i].x, vy = A.wv[i].y, si = 1e9;
+        for (j = 0; j < nb; j++) { var s = nx * (B.wv[j].x - vx) + ny * (B.wv[j].y - vy); if (s < si) si = s; }
+        if (si > best) { best = si; bi = i; }
+      }
+      return { sep: best, edge: bi };
+    }
+    function clip(p, nx, ny, off) {
+      var d1 = nx * p[0].x + ny * p[0].y - off, d2 = nx * p[1].x + ny * p[1].y - off, out = [];
+      if (d1 <= 0) out.push(p[0]); if (d2 <= 0) out.push(p[1]);
+      if (d1 * d2 < 0) { var t = d1 / (d1 - d2); out.push({ x: p[0].x + t * (p[1].x - p[0].x), y: p[0].y + t * (p[1].y - p[0].y) }); }
+      return out;
+    }
+    function ppManifold(A, B) {
+      var sa = maxSep(A, B); if (sa.sep > 0) return null;
+      var sb = maxSep(B, A); if (sb.sep > 0) return null;
+      var flip = sb.sep > sa.sep + 0.0005, ref = flip ? B : A, inc = flip ? A : B, edge = flip ? sb.edge : sa.edge;
+      var nr = ref.shape.v.length, ni = inc.shape.v.length, rn = ref.wn[edge], i, ie = 0, md = 1e9;
+      for (i = 0; i < ni; i++) { var d = rn.x * inc.wn[i].x + rn.y * inc.wn[i].y; if (d < md) { md = d; ie = i; } }
+      var r1 = ref.wv[edge], r2 = ref.wv[(edge + 1) % nr], tx = r2.x - r1.x, ty = r2.y - r1.y, tl = Math.hypot(tx, ty); tx /= tl; ty /= tl;
+      var pts = [{ x: inc.wv[ie].x, y: inc.wv[ie].y }, { x: inc.wv[(ie + 1) % ni].x, y: inc.wv[(ie + 1) % ni].y }];
+      pts = clip(pts, -tx, -ty, -(tx * r1.x + ty * r1.y)); if (pts.length < 2) return null;
+      pts = clip(pts, tx, ty, tx * r2.x + ty * r2.y); if (pts.length < 2) return null;
+      var front = rn.x * r1.x + rn.y * r1.y, out = [];
+      pts.forEach(function (p) { var s = rn.x * p.x + rn.y * p.y - front; if (s <= 0) out.push({ x: p.x - rn.x * s / 2, y: p.y - rn.y * s / 2, d: -s }); });
+      if (!out.length) return null;
+      return { nx: flip ? -rn.x : rn.x, ny: flip ? -rn.y : rn.y, pts: out };
+    }
+    function manifold(A, B) {
+      var ta = A.shape.type, tb = B.shape.type;
+      if (ta === 'circle' && tb === 'circle') return ccManifold(A, B);
+      if (ta === 'poly' && tb === 'poly') return ppManifold(A, B);
+      if (ta === 'poly') return pcManifold(A, B);
+      var m = pcManifold(B, A); if (m) { m.nx = -m.nx; m.ny = -m.ny; } return m;
+    }
+    function detect(w) {
+      var B = w.bodies, n = B.length, i, j, A, C, fresh = {}, arbs = {};
+      for (i = 0; i < n; i++) {
+        A = B[i];
+        for (j = i + 1; j < n; j++) {
+          C = B[j]; if (A.im === 0 && C.im === 0) continue;
+          if (A.maxx < C.minx || C.maxx < A.minx || A.maxy < C.miny || C.maxy < A.miny) continue;
+          var m = manifold(A, C); if (!m) continue;
+          var key = A.id * 65536 + C.id, old = w.arbs[key];
+          var arb = { A: A, C: C, nx: m.nx, ny: m.ny, mu: Math.sqrt(A.mu * C.mu), e: Math.max(A.e, C.e), cs: [], fresh: !old };
+          m.pts.forEach(function (p) {
+            var c = { x: p.x, y: p.y, d: p.d, Pn: 0, Pt: 0 };
+            if (old) { var best = 0.0036; old.cs.forEach(function (o) { var dd = (o.x - p.x) * (o.x - p.x) + (o.y - p.y) * (o.y - p.y); if (dd < best) { best = dd; c.Pn = o.Pn; c.Pt = o.Pt; } }); }
+            arb.cs.push(c);
+          });
+          arbs[key] = arb;
+        }
+      }
+      w.arbs = arbs;
+    }
+
+    /* ---------- joints ---------- */
+    function localAnchor(b, px, py) { var c = Math.cos(b.a), s = Math.sin(b.a), dx = px - b.x, dy = py - b.y; return { x: c * dx + s * dy, y: -s * dx + c * dy }; }
+    function hinge(w, A, B, px, py) { var j = { type: 'hinge', A: A, B: B, la: localAnchor(A, px, py), lb: localAnchor(B, px, py), Px: 0, Py: 0 }; w.joints.push(j); return j; }
+    function link(w, type, A, B, pa, pb, o) {                  // pa, pb: world anchor points
+      o = o || {}; var la = localAnchor(A, pa[0], pa[1]), lb = localAnchor(B, pb[0], pb[1]);
+      var j = { type: type, A: A, B: B, la: la, lb: lb, L: o.L != null ? o.L : Math.max(0.05, Math.hypot(pb[0] - pa[0], pb[1] - pa[1])), hz: o.hz || 2, zeta: o.zeta != null ? o.zeta : 0.15, imp: 0 };
+      w.joints.push(j); return j;
+    }
+    function anchorWorld(b, l) { var c = Math.cos(b.a), s = Math.sin(b.a); return { rx: c * l.x - s * l.y, ry: s * l.x + c * l.y }; }
+    function applyImpulse(A, B, r1x, r1y, r2x, r2y, Px, Py) {
+      A.vx -= A.im * Px; A.vy -= A.im * Py; A.w -= A.iI * (r1x * Py - r1y * Px);
+      B.vx += B.im * Px; B.vy += B.im * Py; B.w += B.iI * (r2x * Py - r2y * Px);
+    }
+    function preJoints(w, h) {
+      var inv = 1 / h;
+      w.joints.forEach(function (j) {
+        var A = j.A, B = j.B, a1 = anchorWorld(A, j.la), a2 = anchorWorld(B, j.lb);
+        j.r1x = a1.rx; j.r1y = a1.ry; j.r2x = a2.rx; j.r2y = a2.ry;
+        var pax = A.x + j.r1x, pay = A.y + j.r1y, pbx = B.x + j.r2x, pby = B.y + j.r2y;
+        if (j.type === 'hinge') {
+          var k11 = A.im + B.im + A.iI * j.r1y * j.r1y + B.iI * j.r2y * j.r2y, k12 = -A.iI * j.r1x * j.r1y - B.iI * j.r2x * j.r2y, k22 = A.im + B.im + A.iI * j.r1x * j.r1x + B.iI * j.r2x * j.r2x, det = k11 * k22 - k12 * k12;
+          j.m11 = k22 / det; j.m12 = -k12 / det; j.m22 = k11 / det;
+          j.bx = -BETA * inv * (pbx - pax); j.by = -BETA * inv * (pby - pay);
+          applyImpulse(A, B, j.r1x, j.r1y, j.r2x, j.r2y, j.Px * 0.9, j.Py * 0.9);
+        } else {
+          var dx = pbx - pax, dy = pby - pay, len = Math.hypot(dx, dy) || 1e-9, ux = dx / len, uy = dy / len, C = len - j.L;
+          j.ux = ux; j.uy = uy; j.active = !(j.type === 'rope' && C <= 0);
+          var rn1 = j.r1x * uy - j.r1y * ux, rn2 = j.r2x * uy - j.r2y * ux, k = A.im + B.im + A.iI * rn1 * rn1 + B.iI * rn2 * rn2, mEff = 1 / k;
+          if (j.type === 'spring') {
+            var omega = TAU * j.hz, dd = 2 * mEff * j.zeta * omega, kk = mEff * omega * omega, g = h * (dd + h * kk);
+            j.gamma = g !== 0 ? 1 / g : 0; j.bias = C * h * kk * j.gamma; j.mass = 1 / (k + j.gamma);
+          } else { j.gamma = 0; j.bias = BETA * inv * C; j.mass = mEff; }
+          if (!j.active) j.imp = 0;
+          if (j.active) { var ws = j.type === 'spring' ? 1 : 0.9; applyImpulse(A, B, j.r1x, j.r1y, j.r2x, j.r2y, j.imp * ws * ux, j.imp * ws * uy); }   // soft constraints need the full impulse
+        }
+      });
+    }
+    function solveJoints(w) {
+      w.joints.forEach(function (j) {
+        var A = j.A, B = j.B;
+        if (j.type === 'hinge') {
+          var dvx = B.vx - B.w * j.r2y - A.vx + A.w * j.r1y, dvy = B.vy + B.w * j.r2x - A.vy - A.w * j.r1x, rx = j.bx - dvx, ry = j.by - dvy;
+          var Px = j.m11 * rx + j.m12 * ry, Py = j.m12 * rx + j.m22 * ry;
+          applyImpulse(A, B, j.r1x, j.r1y, j.r2x, j.r2y, Px, Py); j.Px += Px; j.Py += Py;
+        } else if (j.active) {
+          var cd = j.ux * (B.vx - B.w * j.r2y - A.vx + A.w * j.r1y) + j.uy * (B.vy + B.w * j.r2x - A.vy - A.w * j.r1x);
+          var imp = -j.mass * (cd + j.bias + j.gamma * j.imp), old = j.imp;
+          if (j.type === 'rope') { j.imp = Math.min(old + imp, 0); imp = j.imp - old; } else j.imp += imp;
+          applyImpulse(A, B, j.r1x, j.r1y, j.r2x, j.r2y, imp * j.ux, imp * j.uy);
+        }
+      });
+    }
+
+    /* ---------- contact solver ---------- */
+    function preContacts(w, h) {
+      var inv = 1 / h, key;
+      for (key in w.arbs) {
+        var arb = w.arbs[key], A = arb.A, C = arb.C, nx = arb.nx, ny = arb.ny, tx = ny, ty = -nx;
+        arb.cs.forEach(function (c) {
+          c.r1x = c.x - A.x; c.r1y = c.y - A.y; c.r2x = c.x - C.x; c.r2y = c.y - C.y;
+          var rn1 = c.r1x * nx + c.r1y * ny, rn2 = c.r2x * nx + c.r2y * ny, rt1 = c.r1x * tx + c.r1y * ty, rt2 = c.r2x * tx + c.r2y * ty;
+          c.mN = 1 / (A.im + C.im + A.iI * (c.r1x * c.r1x + c.r1y * c.r1y - rn1 * rn1) + C.iI * (c.r2x * c.r2x + c.r2y * c.r2y - rn2 * rn2));
+          c.mT = 1 / (A.im + C.im + A.iI * (c.r1x * c.r1x + c.r1y * c.r1y - rt1 * rt1) + C.iI * (c.r2x * c.r2x + c.r2y * c.r2y - rt2 * rt2));
+          var dvx = C.vx - C.w * c.r2y - A.vx + A.w * c.r1y, dvy = C.vy + C.w * c.r2x - A.vy - A.w * c.r1x, vn = dvx * nx + dvy * ny;
+          var pos = Math.min(MAXBIAS, BETA * inv * Math.max(0, c.d - SLOP)), rest = vn < -REST_THRESH ? -arb.e * vn : 0;
+          c.bias = Math.max(pos, rest);
+          var Px = c.Pn * nx + c.Pt * tx, Py = c.Pn * ny + c.Pt * ty;
+          applyImpulse(A, C, c.r1x, c.r1y, c.r2x, c.r2y, Px, Py);
+        });
+      }
+    }
+    function solveContacts(w) {
+      var key;
+      for (key in w.arbs) {
+        var arb = w.arbs[key], A = arb.A, C = arb.C, nx = arb.nx, ny = arb.ny, tx = ny, ty = -nx, mu = arb.mu, i, c;
+        for (i = 0; i < arb.cs.length; i++) {
+          c = arb.cs[i];
+          var dvx = C.vx - C.w * c.r2y - A.vx + A.w * c.r1y, dvy = C.vy + C.w * c.r2x - A.vy - A.w * c.r1x, vn = dvx * nx + dvy * ny;
+          var dPn = c.mN * (-vn + c.bias), Pn0 = c.Pn; c.Pn = Math.max(Pn0 + dPn, 0); dPn = c.Pn - Pn0;
+          applyImpulse(A, C, c.r1x, c.r1y, c.r2x, c.r2y, dPn * nx, dPn * ny);
+          dvx = C.vx - C.w * c.r2y - A.vx + A.w * c.r1y; dvy = C.vy + C.w * c.r2x - A.vy - A.w * c.r1x;
+          var vt = dvx * tx + dvy * ty, dPt = c.mT * (-vt), maxPt = mu * c.Pn, Pt0 = c.Pt; c.Pt = clamp(Pt0 + dPt, -maxPt, maxPt); dPt = c.Pt - Pt0;
+          applyImpulse(A, C, c.r1x, c.r1y, c.r2x, c.r2y, dPt * tx, dPt * ty);
+        }
+      }
+    }
+
+    /* ---------- stepping ---------- */
+    function integrateVel(w, h) {
+      var i, b, f = 1 / (1 + h * w.drag), fa = 1 / (1 + h * w.angDrag);
+      for (i = 0; i < w.bodies.length; i++) {
+        b = w.bodies[i]; if (b.im === 0) continue;
+        var ax = w.gx, ay = w.gy, k;
+        for (k = 0; k < w.attractors.length; k++) {
+          var at = w.attractors[k], dx = at.x - b.x, dy = at.y - b.y, r2 = dx * dx + dy * dy + 0.5, r = Math.sqrt(r2), g = at.gm / r2;
+          ax += g * dx / r; ay += g * dy / r;
+        }
+        if (w.mouse && w.mouse.body === b) {
+          var m = w.mouse, an = anchorWorld(b, m.la), px = b.x + an.rx, py = b.y + an.ry, vpx = b.vx - b.w * an.ry, vpy = b.vy + b.w * an.rx, om = 14;
+          var mx = om * om * (m.tx - px) - 2 * om * vpx, my = om * om * (m.ty - py) - 2 * om * vpy, ml = Math.hypot(mx, my), cap = 900;
+          if (ml > cap) { mx *= cap / ml; my *= cap / ml; }
+          b.w += b.iI * b.m * (an.rx * my - an.ry * mx) * h; b.w *= Math.exp(-3 * h); ax += mx; ay += my;
+        }
+        b.vx = (b.vx + ax * h) * f; b.vy = (b.vy + ay * h) * f; b.w *= fa;
+      }
+    }
+    function integratePos(w, h) { var i, b; for (i = 0; i < w.bodies.length; i++) { b = w.bodies[i]; if (b.im === 0) continue; b.x += b.vx * h; b.y += b.vy * h; b.a += b.w * h; updateGeom(b); } }
+    function step(w, dt, sub) {
+      sub = sub || Math.max(4, Math.ceil(dt * 240)); var h = dt / sub, s, it, key;
+      w.events.length = 0;
+      for (s = 0; s < sub; s++) {
+        integrateVel(w, h); detect(w); preContacts(w, h); preJoints(w, h);
+        for (it = 0; it < ITER; it++) { solveJoints(w); solveContacts(w); }
+        integratePos(w, h);
+        for (key in w.arbs) { var arb = w.arbs[key]; if (arb.fresh) { var mx = 0, c0 = arb.cs[0]; arb.cs.forEach(function (c) { if (c.Pn > mx) mx = c.Pn; }); if (mx > 0.6) w.events.push({ x: c0.x, y: c0.y, imp: mx }); } }
+      }
+      w.time += dt;
+      for (var i = w.bodies.length - 1; i >= 0; i--) { var bb = w.bodies[i]; if (bb.im !== 0 && (bb.y < -40 || Math.abs(bb.x) > 120 || bb.y > 400)) { removeBody(w, bb); w.removed++; } }
+    }
+
+    function energy(w) {
+      var K = 0, Pe = 0, px = 0, py = 0;
+      w.bodies.forEach(function (b) { if (b.im === 0) return; K += 0.5 * b.m * (b.vx * b.vx + b.vy * b.vy) + 0.5 * b.I * b.w * b.w; Pe -= b.m * (w.gx * b.x + w.gy * b.y); px += b.m * b.vx; py += b.m * b.vy; });
+      return { K: K, P: Pe, E: K + Pe, p: Math.hypot(px, py), px: px, py: py };
+    }
+    return { newWorld: newWorld, circle: circle, polygon: polygon, box: box, regular: regular, triangle: triangle, add: add, remove: removeBody, setMass: setMass, setStatic: setStatic, hinge: hinge, link: link, step: step, energy: energy, updateGeom: updateGeom, localAnchor: localAnchor, anchorWorld: anchorWorld };
+  })();
+
+  /* ======================================================================
+     THE SANDBOX
+     ====================================================================== */
+  var WORLD_W = 24;
+  var S = { tool: 'drag', ts: 1, bounce: 0.3, fric: 0.5, size: 1, walls: true, vectors: false, trails: false, contacts: false, paused: false, g: 9.81, gm: 60 };
+  var world = Phys.newWorld(), sel = null, sceneName = 'Empty', effects = [], enHist = [], enT = 0;
+  var cv = $('#cv'), ctx = cv.getContext('2d'), stage = cv.parentNode, T = { w: 0, h: 0, dpr: 1 }, view = { s: 40, ox: 0, oy: 0 };
+  var ptr = { x: 0, y: 0, px: 0, py: 0, on: false }, aim = null, wallDrag = null, linkA = null, panDrag = null, grabInfo = null;
+  var walls = [], floorB = null, visible = true, lastT = 0;
+
+  function addB(b) { return Phys.add(world, b); }
+  function mat(o) { o = o || {}; o.e = o.e != null ? o.e : S.bounce; o.mu = o.mu != null ? o.mu : S.fric; return o; }
+  function buildArena() {
+    walls.forEach(function (b) { Phys.remove(world, b); }); walls = [];
+    if (!floorB || world.bodies.indexOf(floorB) < 0) { floorB = Phys.box(WORLD_W / 2, -0.5, WORLD_W + 40, 1, { static: true, e: 0.2, mu: 0.6 }); addB(floorB); floorB.tag = 'floor'; floorB.isArena = true; }
+    if (S.walls) {
+      [[-0.5, 25], [WORLD_W + 0.5, 25]].forEach(function (p) { var b = Phys.box(p[0], p[1], 1, 60, { static: true, e: 0.2, mu: 0.4 }); b.isArena = true; addB(b); walls.push(b); });
+    }
+  }
+  function clearAll(keepScene) {
+    world.bodies.slice().forEach(function (b) { if (!b.isArena) Phys.remove(world, b); });
+    world.joints = []; world.attractors = []; sel = null; effects = []; enHist = []; world.mouse = null; world.removed = 0;
+    if (!keepScene) sceneName = 'Empty';
+    renderInspector();
+  }
+
+  /* ---------- scenes ---------- */
+  var SCENES = [
+    { name: 'Pyramid', build: function () {
+      var rows = 8, bw = 1.0, y0 = 0.5, i, j;
+      for (i = 0; i < rows; i++) for (j = 0; j < rows - i; j++) addB(Phys.box(WORLD_W / 2 - (rows - i - 1) * bw * 0.52 + j * bw * 1.04 - bw * 0.0, y0 + i * (bw + 0.01), bw, bw, mat({ e: 0.1 })));
+      addB(Phys.circle(2.2, 9, 0.8, mat({ density: 2, hot: true, vx: 9, vy: 0, e: 0.2 })));
+    } },
+    { name: 'Dominoes', build: function () {
+      var i; for (i = 0; i < 13; i++) addB(Phys.box(8 + i * 1.0, 0.85, 0.22, 1.7, mat({ e: 0.05, mu: 0.6 })));
+      addB(Phys.circle(2.5, 1.2, 0.5, mat({ density: 2, hot: true, vx: 7, e: 0.1 })));
+    } },
+    { name: "Newton's cradle", build: function () {
+      var n = 5, r = 0.5, L = 6, cx = WORLD_W / 2 - (n - 1) * r, py = 11, i, balls = [];
+      for (i = 0; i < n; i++) { var b = Phys.circle(cx + i * 2 * r * 1.002, py - L, r, { density: 4, e: 1, mu: 0, hot: i === 0 }); addB(b); balls.push(b); Phys.link(world, 'rod', world.ground, b, [cx + i * 2 * r * 1.002, py], [b.x, b.y]); }
+      var th = 0.9, b0 = balls[0], px = cx; b0.x = px - L * Math.sin(th); b0.y = py - L * Math.cos(th); Phys.updateGeom(b0);
+      world.joints.forEach(function (j) { if (j.B === b0) j.lb = { x: 0, y: 0 }; j.la = { x: j.la.x, y: j.la.y }; });
+      var j0 = world.joints.filter(function (j) { return j.B === b0; })[0]; j0.la = { x: px, y: py };
+    } },
+    { name: 'Pendulum chain', build: function () {
+      var n = 7, len = 1.5, prev = world.ground, i, px = WORLD_W / 2 - 2, py = 12;
+      for (i = 0; i < n; i++) { var b = Phys.box(px + len * (i + 0.5), py, len * 0.96, 0.28, mat({ density: 1, e: 0.1, mu: 0.3, hot: i === n - 1 })); addB(b); Phys.hinge(world, prev, b, px + len * i, py); prev = b; }
+    } },
+    { name: 'Wrecking ball', build: function () {
+      var i, j, bx = 15; for (i = 0; i < 6; i++) for (j = 0; j < 4; j++) addB(Phys.box(bx + j * 1.02, 0.5 + i * 1.01, 1, 1, mat({ e: 0.1 })));
+      var ball = Phys.circle(4, 10, 1.1, mat({ density: 6, hot: true, e: 0.1 })); addB(ball);
+      var th = 1.0, L = 8, pxp = 11, pyp = 12; ball.x = pxp - L * Math.sin(th); ball.y = pyp - L * Math.cos(th); Phys.updateGeom(ball); Phys.link(world, 'rod', world.ground, ball, [pxp, pyp], [ball.x, ball.y]);
+      world.joints[world.joints.length - 1].la = { x: pxp, y: pyp };
+    } },
+    { name: 'Bridge', build: function () {
+      var n = 11, w = 1.4, x0 = 4, y = 6, prev = null, i;
+      var left = Phys.box(x0 - 0.7, y - 1, 1.4, 2, { static: true }); addB(left); var right = Phys.box(x0 + n * w + 0.7, y - 1, 1.4, 2, { static: true }); addB(right);
+      prev = left;
+      for (i = 0; i < n; i++) { var p = Phys.box(x0 + w * (i + 0.5), y - 0.12, w * 0.97, 0.24, mat({ density: 1.5, e: 0.1, mu: 0.8 })); addB(p); Phys.hinge(world, prev, p, x0 + w * i, y - 0.12); prev = p; }
+      Phys.hinge(world, prev, right, x0 + w * n, y - 0.12);
+      [0, 1, 2].forEach(function (k) { addB(Phys.circle(x0 + 3 + k * 2.2, 9 + k * 2, 0.55, mat({ density: 2, hot: k === 0 }))); });
+    } }
   ];
-
-  const COLORS = ['#ffd166','#06d6a0','#ef476f','#4cc9f0','#c77dff','#ff9f1c','#b5e48c','#f72585'];
-  const MAX_SHOTS = 10;
-  const DT = 0.01;
-
-  const P = { g:9.81, v:40, a:45, k:0.005, h:0, s:2 };
-  let world = 'earth';
-  let showVac = true;
-  let dirty = true;
-  let preview = null, vacuum = null;
-  const shots = [];
-  let colorIdx = 0;
-
-  /* ---------- Physics ---------- */
-  function rk4(s, dt, k, g) {
-    const acc = (vx, vy) => { const sp = Math.hypot(vx, vy); return [-k*sp*vx, -g - k*sp*vy]; };
-    const [a1x,a1y] = acc(s.vx, s.vy);
-    const v2x = s.vx + a1x*dt/2, v2y = s.vy + a1y*dt/2; const [a2x,a2y] = acc(v2x, v2y);
-    const v3x = s.vx + a2x*dt/2, v3y = s.vy + a2y*dt/2; const [a3x,a3y] = acc(v3x, v3y);
-    const v4x = s.vx + a3x*dt,   v4y = s.vy + a3y*dt;   const [a4x,a4y] = acc(v4x, v4y);
-    s.x  += dt*(s.vx + 2*v2x + 2*v3x + v4x)/6;
-    s.y  += dt*(s.vy + 2*v2y + 2*v3y + v4y)/6;
-    s.vx += dt*(a1x + 2*a2x + 2*a3x + a4x)/6;
-    s.vy += dt*(a1y + 2*a2y + 2*a3y + a4y)/6;
+  function loadScene(name) {
+    clearAll(true); var sc = SCENES.filter(function (s) { return s.name === name; })[0]; sceneName = name;
+    if (sc) sc.build(); buildArena(); enHist = []; syncPressed(); renderInspector();
   }
 
-  function simulate(g, v, angleDeg, k, h) {
-    const r = angleDeg * Math.PI / 180;
-    const s = { x:0, y:h, vx:v*Math.cos(r), vy:v*Math.sin(r) };
-    const pts = [0, h];
-    let maxH = h, t = 0, n = 0, range = 0, impact = v;
-    while (n < 100000) {
-      const px = s.x, py = s.y;
-      rk4(s, DT, k, g); t += DT; n++;
-      if (s.y < 0) {
-        const f = py / (py - s.y);
-        s.x = px + (s.x - px) * f; s.y = 0; t -= DT * (1 - f);
-        pts.push(s.x, 0);
-        range = s.x; impact = Math.hypot(s.vx, s.vy);
-        break;
-      }
-      if (s.y > maxH) maxH = s.y;
-      if (n % 5 === 0) pts.push(s.x, s.y);
-      range = s.x;
+  /* ---------- view ---------- */
+  function region() { return T.w < 860 ? { x0: 12, x1: T.w - 12, y0: 12, y1: T.h - 12 } : { x0: T.w * .31, x1: T.w - 60, y0: 170, y1: T.h - 130 }; }
+  function fitView() {
+    var r = region(), s = Math.min((r.x1 - r.x0) / (WORLD_W + 1.2), (r.y1 - r.y0) / 15.5);
+    view.s = s; view.ox = (r.x0 + r.x1) / 2 - (WORLD_W / 2) * s; view.oy = r.y1;
+  }
+  function w2s(x, y) { return [view.ox + x * view.s, view.oy - y * view.s]; }
+  function s2w(px, py) { return [(px - view.ox) / view.s, (view.oy - py) / view.s]; }
+  function zoomAt(px, py, f) { var w = s2w(px, py); view.s = clamp(view.s * f, 6, 200); view.ox = px - w[0] * view.s; view.oy = py + w[1] * view.s; }
+
+  /* ---------- drawing ---------- */
+  function polyPath(c, b) { var i, n = b.wv.length, p = w2s(b.wv[0].x, b.wv[0].y); c.beginPath(); c.moveTo(p[0], p[1]); for (i = 1; i < n; i++) { p = w2s(b.wv[i].x, b.wv[i].y); c.lineTo(p[0], p[1]); } c.closePath(); }
+  function bodyPath(c, b) { if (b.shape.type === 'circle') { var p = w2s(b.x, b.y); c.beginPath(); c.arc(p[0], p[1], b.shape.r * view.s, 0, TAU); } else polyPath(c, b); }
+  function draw(dt, now) {
+    var w = T.w, h = T.h, c = ctx, s = view.s, i;
+    c.setTransform(T.dpr, 0, 0, T.dpr, 0, 0); c.clearRect(0, 0, w, h);
+    /* metre grid */
+    if (s > 12) {
+      var x0 = Math.floor(s2w(0, 0)[0]), x1 = Math.ceil(s2w(w, 0)[0]), y1 = Math.ceil(s2w(0, 0)[1]), y0 = Math.floor(s2w(0, h)[1]), gx, gy; c.fillStyle = W(.11);
+      for (gx = Math.max(x0, -3); gx <= Math.min(x1, WORLD_W + 3); gx++) for (gy = Math.max(y0, 0); gy <= Math.min(y1, 40); gy++) { var q = w2s(gx, gy); c.fillRect(q[0] - .8, q[1] - .8, 1.6, 1.6); }
+      for (gx = 0; gx <= WORLD_W; gx += 5) { var qq = w2s(gx, 0); txt(c, String(gx), qq[0], qq[1] + 18, 9, W(.35), 'center'); }
     }
-    return { pts, range, maxH, time:t, impact };
-  }
-
-  function refresh() {
-    preview = simulate(P.g, P.v, P.a, P.k, P.h);
-    vacuum  = simulate(P.g, P.v, P.a, 0, P.h);
-    $('s-range').textContent = fmtDist(preview.range);
-    $('s-max').textContent   = fmtDist(preview.maxH);
-    $('s-time').textContent  = fmtTime(preview.time);
-    $('s-imp').textContent   = preview.impact.toFixed(1) + ' m/s';
-    let note = '';
-    if (P.k === 0) note = 'No air: a clean parabola.';
-    else if (vacuum.range > 0.5) {
-      const cut = (1 - preview.range / vacuum.range) * 100;
-      note = cut < 0.5 ? 'Air barely changes this shot.' : `Air resistance cuts the range by ${cut.toFixed(cut < 10 ? 1 : 0)}%.`;
-    }
-    $('note').textContent = note;
-    dirty = false;
-  }
-
-  function launch() {
-    if (dirty) refresh();
-    const r = P.a * Math.PI / 180;
-    shots.push({
-      s:{ x:0, y:P.h, vx:P.v*Math.cos(r), vy:P.v*Math.sin(r) },
-      pts:[0, P.h], color:COLORS[colorIdx++ % COLORS.length],
-      k:P.k, g:P.g, t:0, acc:0, n:0, done:false,
-      range:0, maxH:P.h, pr:preview.range, ph:preview.maxH
+    /* attractors */
+    world.attractors.forEach(function (at) {
+      var p = w2s(at.x, at.y), g = c.createRadialGradient(p[0], p[1], 0, p[0], p[1], 46); g.addColorStop(0, Ac(.9)); g.addColorStop(.25, Ac(.35)); g.addColorStop(1, Ac(0)); c.fillStyle = g; c.beginPath(); c.arc(p[0], p[1], 46, 0, TAU); c.fill();
+      c.fillStyle = '#fff'; c.beginPath(); c.arc(p[0], p[1], 4, 0, TAU); c.fill();
     });
-    if (shots.length > MAX_SHOTS) shots.shift();
+    /* trails */
+    if (S.trails) world.bodies.forEach(function (b) {
+      if (b.im === 0 || b.trail.length < 4) return; c.strokeStyle = b.hot ? Ac(.4) : W(.25); c.lineWidth = 1.2; c.beginPath();
+      b.trail.forEach(function (q, k) { var p = w2s(q[0], q[1]); if (k === 0) c.moveTo(p[0], p[1]); else c.lineTo(p[0], p[1]); }); c.stroke();
+    });
+    /* joints */
+    world.joints.forEach(function (j) {
+      var a1 = Phys.anchorWorld(j.A, j.la), a2 = Phys.anchorWorld(j.B, j.lb), p1 = w2s(j.A.x + a1.rx, j.A.y + a1.ry), p2 = w2s(j.B.x + a2.rx, j.B.y + a2.ry);
+      c.lineWidth = 1.5;
+      if (j.type === 'hinge') { c.strokeStyle = W(.9); c.fillStyle = 'rgba(20,21,23,1)'; c.beginPath(); c.arc(p1[0], p1[1], 5, 0, TAU); c.fill(); c.stroke(); if (j.A.ground || j.B.ground) { c.strokeStyle = W(.4); c.beginPath(); c.arc(p1[0], p1[1], 9, 0, TAU); c.stroke(); } return; }
+      if (j.type === 'rod') { c.strokeStyle = W(.8); c.beginPath(); c.moveTo(p1[0], p1[1]); c.lineTo(p2[0], p2[1]); c.stroke(); }
+      else if (j.type === 'rope') { c.setLineDash([5, 4]); c.strokeStyle = W(.8); c.beginPath(); c.moveTo(p1[0], p1[1]); c.lineTo(p2[0], p2[1]); c.stroke(); c.setLineDash([]); }
+      else {
+        var dx = p2[0] - p1[0], dy = p2[1] - p1[1], l = Math.hypot(dx, dy) || 1, ux = dx / l, uy = dy / l, nx = -uy, ny = ux, n = 10, k; c.strokeStyle = Ac(.95); c.beginPath(); c.moveTo(p1[0], p1[1]);
+        c.lineTo(p1[0] + ux * l * .15, p1[1] + uy * l * .15);
+        for (k = 0; k < n; k++) { var t = .15 + .7 * (k + .5) / n, sgn = k % 2 ? 1 : -1; c.lineTo(p1[0] + ux * l * t + nx * 7 * sgn, p1[1] + uy * l * t + ny * 7 * sgn); }
+        c.lineTo(p1[0] + ux * l * .85, p1[1] + uy * l * .85); c.lineTo(p2[0], p2[1]); c.stroke();
+      }
+      c.fillStyle = W(.9); [p1, p2].forEach(function (p) { c.beginPath(); c.arc(p[0], p[1], 3, 0, TAU); c.fill(); });
+    });
+    /* bodies */
+    world.bodies.forEach(function (b) {
+      bodyPath(c, b);
+      if (b.im === 0) { c.fillStyle = W(.1); c.fill(); c.strokeStyle = W(.5); c.lineWidth = 1.2; c.stroke(); }
+      else if (b.hot) { c.fillStyle = Ac(.88); c.fill(); c.strokeStyle = Ac(1); c.lineWidth = 1.4; c.stroke(); }
+      else { c.fillStyle = W(.06); c.fill(); c.strokeStyle = W(.92); c.lineWidth = 1.4; c.stroke(); }
+      if (b.shape.type === 'circle') { var p = w2s(b.x, b.y), r = b.shape.r * s; c.strokeStyle = b.hot ? 'rgba(30,10,8,.55)' : W(.4); c.lineWidth = 1.2; c.beginPath(); c.moveTo(p[0], p[1]); c.lineTo(p[0] + Math.cos(b.a) * r, p[1] - Math.sin(b.a) * r); c.stroke(); }
+    });
+    if (sel && world.bodies.indexOf(sel) >= 0) { bodyPath(c, sel); c.strokeStyle = Ac(1); c.lineWidth = 2.6; c.stroke(); }
+    /* vectors */
+    if (S.vectors) world.bodies.forEach(function (b) {
+      if (b.im === 0) return; var sp = Math.hypot(b.vx, b.vy); if (sp < 0.3) return; var p = w2s(b.x, b.y), len = clamp(sp * s * .1, 8, 110);
+      c.strokeStyle = Ac(.95); c.fillStyle = Ac(.95); c.lineWidth = 1.5; arrow(c, p[0], p[1], p[0] + b.vx / sp * len, p[1] - b.vy / sp * len, 6);
+    });
+    /* contacts */
+    if (S.contacts) { var key; for (key in world.arbs) { var arb = world.arbs[key]; arb.cs.forEach(function (ct) { var p = w2s(ct.x, ct.y); c.fillStyle = Ac(.95); c.beginPath(); c.arc(p[0], p[1], 3.2, 0, TAU); c.fill(); c.strokeStyle = Ac(.8); c.lineWidth = 1.2; c.beginPath(); c.moveTo(p[0], p[1]); c.lineTo(p[0] + arb.nx * 12, p[1] - arb.ny * 12); c.stroke(); }); } }
+    /* impact rings */
+    effects = effects.filter(function (f) { return now - f.t < 520; });
+    effects.forEach(function (f) { var age = (now - f.t) / 520, p = w2s(f.x, f.y); c.strokeStyle = Ac((1 - age) * .9); c.lineWidth = 1.4; c.beginPath(); c.arc(p[0], p[1], 4 + age * (10 + Math.min(40, f.imp * 3)), 0, TAU); c.stroke(); });
+    /* grab line */
+    if (world.mouse) { var m = world.mouse, an = Phys.anchorWorld(m.body, m.la), pa = w2s(m.body.x + an.rx, m.body.y + an.ry), pt = w2s(m.tx, m.ty); c.setLineDash([3, 4]); c.strokeStyle = Ac(.9); c.lineWidth = 1.2; c.beginPath(); c.moveTo(pa[0], pa[1]); c.lineTo(pt[0], pt[1]); c.stroke(); c.setLineDash([]); c.fillStyle = Ac(1); c.beginPath(); c.arc(pa[0], pa[1], 3.5, 0, TAU); c.fill(); }
+    drawPreviews(c, now);
   }
-
-  function advance(simDt) {
-    for (const sh of shots) {
-      if (sh.done) continue;
-      sh.acc += simDt;
-      while (sh.acc >= DT && !sh.done) {
-        sh.acc -= DT;
-        const px = sh.s.x, py = sh.s.y;
-        rk4(sh.s, DT, sh.k, sh.g); sh.t += DT; sh.n++;
-        if (sh.s.y < 0) {
-          const f = py / (py - sh.s.y);
-          sh.s.x = px + (sh.s.x - px) * f; sh.s.y = 0; sh.t -= DT * (1 - f);
-          sh.pts.push(sh.s.x, 0);
-          sh.done = true; sh.range = sh.s.x;
-          break;
-        }
-        if (sh.s.y > sh.maxH) sh.maxH = sh.s.y;
-        if (sh.n % 2 === 0) sh.pts.push(sh.s.x, sh.s.y);
+  function ghostShape(tool, x, y, size) {
+    if (tool === 'circle') return Phys.circle(x, y, size / 2);
+    if (tool === 'box') return Phys.box(x, y, size, size);
+    if (tool === 'tri') return Phys.triangle(x, y, size * .62);
+    if (tool === 'hex') return Phys.regular(x, y, size * .55, 6);
+    if (tool === 'plank') return Phys.box(x, y, size * 3, size * .3);
+    return null;
+  }
+  var SPAWN = { circle: 1, box: 1, tri: 1, hex: 1, plank: 1 };
+  function drawPreviews(c, now) {
+    var s = view.s;
+    if (SPAWN[S.tool] && ptr.on) {
+      var wp = aim ? [aim.x, aim.y] : s2w(ptr.px, ptr.py), g = ghostShape(S.tool, wp[0], wp[1], S.size);
+      c.setLineDash([4, 4]); bodyPath(c, g); c.strokeStyle = W(.7); c.lineWidth = 1.2; c.stroke(); c.setLineDash([]);
+      if (aim) {
+        var cur = s2w(ptr.px, ptr.py), vx = clamp((wp[0] - cur[0]) * 3, -45, 45), vy = clamp((wp[1] - cur[1]) * 3, -45, 45), p0 = w2s(wp[0], wp[1]), p1 = w2s(wp[0] + vx * .25, wp[1] + vy * .25);
+        c.strokeStyle = Ac(1); c.fillStyle = Ac(1); c.lineWidth = 1.6; arrow(c, p0[0], p0[1], p1[0], p1[1], 7);
+        c.fillStyle = Ac(.8); var k, t, gx = world.gx, gy = world.gy; for (k = 1; k < 24; k++) { t = k * 0.08; var q = w2s(wp[0] + vx * t + .5 * gx * t * t, wp[1] + vy * t + .5 * gy * t * t); c.fillRect(q[0] - 1.4, q[1] - 1.4, 2.8, 2.8); }
+        txt(c, fN(Math.hypot(vx, vy), 1) + ' m/s', p1[0] + 10, p1[1] - 8, 10, Ac(1));
       }
     }
+    if (S.tool === 'wall' && wallDrag) { var a = w2s(wallDrag.x0, wallDrag.y0), b = w2s(wallDrag.x1, wallDrag.y1); c.strokeStyle = W(.8); c.lineWidth = 3; c.lineCap = 'round'; c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); c.lineCap = 'butt'; }
+    if (linkA) { var pa = w2s(linkA.wx, linkA.wy); c.fillStyle = Ac(1); c.beginPath(); c.arc(pa[0], pa[1], 4.5, 0, TAU); c.fill(); if (ptr.on) { c.setLineDash([4, 4]); c.strokeStyle = Ac(.8); c.lineWidth = 1.3; c.beginPath(); c.moveTo(pa[0], pa[1]); c.lineTo(ptr.px, ptr.py); c.stroke(); c.setLineDash([]); } }
+    if (S.tool === 'attract' && ptr.on) { c.strokeStyle = Ac(.8); c.setLineDash([3, 4]); c.beginPath(); c.arc(ptr.px, ptr.py, 12, 0, TAU); c.stroke(); c.setLineDash([]); }
   }
 
-  /* ---------- DOM helpers ---------- */
-  function $(id){ return document.getElementById(id); }
-  function fmtDist(m){ return m >= 1000 ? (m/1000).toFixed(2) + ' km' : m.toFixed(1) + ' m'; }
-  function fmtTime(s){ return s >= 100 ? s.toFixed(0) + ' s' : s.toFixed(2) + ' s'; }
-
-  const inputs = {};
-  CONTROLS.forEach(c => {
-    const d = document.createElement('div');
-    d.className = 'ctl';
-    d.innerHTML = `<div class="row"><label for="i-${c.id}">${c.label}</label><output id="o-${c.id}"></output></div>` +
-                  `<input type="range" id="i-${c.id}" min="${c.min}" max="${c.max}" step="${c.step}" value="${c.val}">`;
-    $('controls').appendChild(d);
-    const input = d.querySelector('input');
-    inputs[c.id] = { c, input, out:d.querySelector('output') };
-    input.addEventListener('input', () => setParam(c.id, parseFloat(input.value), true));
-  });
-
-  function setParam(id, val, fromUser) {
-    const { c, input, out } = inputs[id];
-    P[id] = val;
-    if (!fromUser) input.value = val;
-    out.textContent = c.fmt(val);
-    input.style.setProperty('--p', ((val - c.min) / (c.max - c.min) * 100) + '%');
-    if (id !== 's') dirty = true;
-    if (id === 'g' || id === 'k') syncWorldButtons();
-  }
-
-  const worldBtns = {};
-  Object.entries(WORLDS).forEach(([key, w]) => {
-    const b = document.createElement('button');
-    b.className = 'world';
-    b.innerHTML = `<i style="background:${w.dot}"></i><b>${w.name}</b><span>${w.g} m/s²</span>`;
-    b.addEventListener('click', () => setWorld(key));
-    $('worlds').appendChild(b);
-    worldBtns[key] = b;
-  });
-
-  function syncWorldButtons() {
-    for (const [key, w] of Object.entries(WORLDS)) {
-      worldBtns[key].classList.toggle('active', Math.abs(P.g - w.g) < 1e-6 && Math.abs(P.k - w.k) < 1e-9);
-    }
-  }
-
-  function setWorld(key) {
-    world = key;
-    document.body.dataset.world = key;
-    setParam('g', WORLDS[key].g, false);
-    setParam('k', WORLDS[key].k, false);
-    syncWorldButtons();
-  }
-
-  $('vac').addEventListener('change', e => { showVac = e.target.checked; });
-  $('launch').addEventListener('click', launch);
-  $('clear').addEventListener('click', () => { shots.length = 0; });
-  window.addEventListener('keydown', e => {
-    if (e.target.tagName === 'BUTTON') return;
-    if (e.code === 'Space') { e.preventDefault(); launch(); }
-    else if (e.code === 'KeyC') shots.length = 0;
-  });
-
-  /* ---------- Canvas ---------- */
-  const cv = $('cv');
-  const ctx = cv.getContext('2d');
-  let W = 0, H = 0, dpr = 1, scale = 0;
-
+  /* ---------- canvas size, hit tests ---------- */
   function resize() {
-    dpr = window.devicePixelRatio || 1;
-    const r = cv.getBoundingClientRect();
-    W = r.width; H = r.height;
-    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    var r = stage.getBoundingClientRect(), w = Math.max(1, Math.round(r.width)), h = Math.max(1, Math.round(r.height)), dpr = Math.min(window.devicePixelRatio || 1, 2);
+    while (w * h * dpr * dpr > 6.5e6 && dpr > 1) dpr -= .25;
+    var first = T.w === 0; T.w = w; T.h = h; T.dpr = dpr; cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); cv.style.width = w + 'px'; cv.style.height = h + 'px';
+    if (first || T.fitOnResize) fitView();
   }
-  new ResizeObserver(resize).observe(cv.parentElement);
-
-  const stars = Array.from({ length:150 }, () => ({ x:Math.random(), y:Math.random(), r:0.4 + Math.random()*1.1, a:0.3 + Math.random()*0.7 }));
-
-  function niceStep(raw) {
-    const p = Math.pow(10, Math.floor(Math.log10(raw)));
-    const f = raw / p;
-    return (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10) * p;
+  function local(e) { var r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * (T.w / r.width), (e.clientY - r.top) * (T.h / r.height)]; }
+  function inBody(b, x, y) {
+    if (b.shape.type === 'circle') return Math.hypot(x - b.x, y - b.y) <= b.shape.r;
+    var i, n = b.wv.length; for (i = 0; i < n; i++) if (b.wn[i].x * (x - b.wv[i].x) + b.wn[i].y * (y - b.wv[i].y) > 0) return false; return true;
   }
-
-  function drawPath(pts, sx, sy, extra) {
-    ctx.beginPath();
-    ctx.moveTo(sx(pts[0]), sy(pts[1]));
-    for (let i = 2; i < pts.length; i += 2) ctx.lineTo(sx(pts[i]), sy(pts[i+1]));
-    if (extra) ctx.lineTo(sx(extra[0]), sy(extra[1]));
-    ctx.stroke();
+  function bodyAt(x, y) { var i; for (i = world.bodies.length - 1; i >= 0; i--) { var b = world.bodies[i]; if (!b.isArena && inBody(b, x, y)) return b; } for (i = 0; i < world.bodies.length; i++) if (inBody(world.bodies[i], x, y)) return world.bodies[i]; return null; }
+  function jointAt(px, py, hingeOnly) {
+    var best = null, bd = 9; world.joints.forEach(function (j) {
+      if (hingeOnly && j.type !== 'hinge') return;
+      var a1 = Phys.anchorWorld(j.A, j.la), a2 = Phys.anchorWorld(j.B, j.lb), p1 = w2s(j.A.x + a1.rx, j.A.y + a1.ry), p2 = w2s(j.B.x + a2.rx, j.B.y + a2.ry), dx = p2[0] - p1[0], dy = p2[1] - p1[1], l2 = dx * dx + dy * dy;
+      var t = l2 ? clamp(((px - p1[0]) * dx + (py - p1[1]) * dy) / l2, 0, 1) : 0, d = Math.hypot(px - (p1[0] + t * dx), py - (p1[1] + t * dy)); if (d < bd) { bd = d; best = j; }
+    }); return best;
   }
 
-  function draw() {
-    if (!W) return;
-    const wd = WORLDS[world];
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    const mL = 56, mR = 28, mT = 64, mB = 44;
-    const ox = mL, oy = H - mB;
-
-    // view bounds
-    let tx = preview.range, ty = Math.max(preview.maxH, P.h);
-    if (showVac) { tx = Math.max(tx, vacuum.range); ty = Math.max(ty, vacuum.maxH); }
-    for (const sh of shots) { tx = Math.max(tx, sh.pr, sh.range, sh.s.x); ty = Math.max(ty, sh.ph, sh.maxH); }
-    tx = Math.max(tx * 1.08, 10); ty = Math.max(ty * 1.15, 6);
-    const target = Math.min((W - mL - mR) / tx, (oy - mT) / ty);
-    scale = scale ? scale * Math.pow(target / scale, 0.12) : target;
-
-    const sx = x => ox + x * scale;
-    const sy = y => oy - y * scale;
-
-    // sky
-    const sky = ctx.createLinearGradient(0, 0, 0, oy);
-    sky.addColorStop(0, wd.skyTop); sky.addColorStop(1, wd.skyBot);
-    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
-    if (wd.stars > 0) {
-      ctx.fillStyle = '#fff';
-      for (const s of stars) {
-        ctx.globalAlpha = s.a * wd.stars;
-        ctx.beginPath(); ctx.arc(s.x * W, s.y * oy, s.r, 0, 6.2832); ctx.fill();
-      }
-      ctx.globalAlpha = 1;
-    }
-
-    // grid
-    const step = niceStep(90 / scale);
-    ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255,255,255,.09)';
-    ctx.beginPath();
-    for (let x = 0; sx(x) < W; x += step) { ctx.moveTo(Math.round(sx(x)) + .5, mT - 20); ctx.lineTo(Math.round(sx(x)) + .5, oy); }
-    for (let y = step; sy(y) > mT - 20; y += step) { ctx.moveTo(ox, Math.round(sy(y)) + .5); ctx.lineTo(W, Math.round(sy(y)) + .5); }
-    ctx.stroke();
-
-    // ground
-    ctx.fillStyle = wd.ground; ctx.fillRect(0, oy, W, H - oy);
-    ctx.fillStyle = wd.edge; ctx.fillRect(0, oy, W, 2);
-
-    // labels
-    ctx.font = '12px system-ui, sans-serif';
-    ctx.fillStyle = 'rgba(255,255,255,.75)';
-    ctx.textAlign = 'center';
-    for (let x = 0; sx(x) < W - 14; x += step) ctx.fillText(+x.toPrecision(4), sx(x), oy + 19);
-    ctx.textAlign = 'right';
-    for (let y = step; sy(y) > mT - 10; y += step) ctx.fillText(+y.toPrecision(4), ox - 8, sy(y) + 4);
-    ctx.textAlign = 'right';
-    ctx.fillStyle = 'rgba(255,255,255,.5)';
-    ctx.fillText('meters', W - 10, oy + 36);
-
-    // vacuum ghost
-    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-    if (showVac && P.k > 0) {
-      ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.lineWidth = 1.5; ctx.setLineDash([2, 6]);
-      drawPath(vacuum.pts, sx, sy);
-    }
-    // preview
-    ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--accent').trim() || '#fff';
-    ctx.globalAlpha = 0.85; ctx.lineWidth = 2; ctx.setLineDash([9, 7]);
-    drawPath(preview.pts, sx, sy);
-    ctx.globalAlpha = 1; ctx.setLineDash([]);
-
-    // trails
-    shots.forEach((sh, i) => {
-      const age = shots.length - 1 - i;
-      ctx.globalAlpha = Math.max(0.35, 1 - age * 0.09);
-      ctx.strokeStyle = sh.color; ctx.lineWidth = 2.5;
-      drawPath(sh.pts, sx, sy, sh.done ? null : [sh.s.x, sh.s.y]);
-      ctx.globalAlpha = 1;
-      if (sh.done) {
-        ctx.fillStyle = sh.color;
-        ctx.beginPath(); ctx.arc(sx(sh.range), oy, 4, 0, 6.2832); ctx.fill();
-        if (i === shots.length - 1) {
-          ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.font = '600 12px system-ui, sans-serif';
-          ctx.fillText(fmtDist(sh.range), Math.min(Math.max(sx(sh.range), 40), W - 40), oy - 12);
-        }
-      }
-    });
-
-    // tower + cannon
-    if (P.h > 0) {
-      ctx.fillStyle = 'rgba(255,255,255,.22)';
-      ctx.fillRect(ox - 8, sy(P.h), 16, oy - sy(P.h));
-    }
-    const ang = P.a * Math.PI / 180;
-    ctx.strokeStyle = '#dfe5ef'; ctx.lineWidth = 8; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(ox, sy(P.h)); ctx.lineTo(ox + Math.cos(ang) * 30, sy(P.h) - Math.sin(ang) * 30); ctx.stroke();
-    ctx.fillStyle = '#8c97aa';
-    ctx.beginPath(); ctx.arc(ox, sy(P.h), 9, 0, 6.2832); ctx.fill();
-
-    // balls + velocity arrows
-    for (const sh of shots) {
-      if (sh.done) continue;
-      const bx = sx(sh.s.x), by = sy(sh.s.y);
-      ctx.shadowColor = sh.color; ctx.shadowBlur = 14;
-      ctx.fillStyle = sh.color;
-      ctx.beginPath(); ctx.arc(bx, by, 6, 0, 6.2832); ctx.fill();
-      ctx.shadowBlur = 0;
-      const sp = Math.hypot(sh.s.vx, sh.s.vy);
-      if (sp > 0.01) {
-        const len = Math.min(56, sp * 0.8), ux = sh.s.vx / sp, uy = -sh.s.vy / sp;
-        const ex = bx + ux * len, ey = by + uy * len;
-        ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5;
-        ctx.beginPath(); ctx.moveTo(bx + ux * 8, by + uy * 8); ctx.lineTo(ex, ey);
-        ctx.lineTo(ex - ux * 6 - uy * 4, ey - uy * 6 + ux * 4);
-        ctx.moveTo(ex, ey); ctx.lineTo(ex - ux * 6 + uy * 4, ey - uy * 6 - ux * 4);
-        ctx.stroke();
-      }
-    }
-
-    updateHud();
+  /* ---------- spawning ---------- */
+  function spawn(tool, x, y, vx, vy) {
+    var o = mat({ vx: vx || 0, vy: vy || 0 }), sz = S.size, b;
+    if (tool === 'circle') b = Phys.circle(x, y, sz / 2, o); else if (tool === 'box') b = Phys.box(x, y, sz, sz, o); else if (tool === 'tri') b = Phys.triangle(x, y, sz * .62, o);
+    else if (tool === 'hex') b = Phys.regular(x, y, sz * .55, 6, o); else b = Phys.box(x, y, sz * 3, sz * .3, o);
+    if (world.bodies.length > 260) return null;
+    return addB(b);
   }
 
+  /* ---------- pointer interaction ---------- */
+  cv.addEventListener('pointerdown', function (e) {
+    if (e.button && e.button !== 0) return;
+    var p = local(e), w = s2w(p[0], p[1]); ptr = { x: w[0], y: w[1], px: p[0], py: p[1], on: true };
+    try { cv.setPointerCapture(e.pointerId); } catch (x) { }
+    var t = S.tool, hit = bodyAt(w[0], w[1]);
+    if (t === 'drag') {
+      if (hit && !hit.isArena) { sel = hit; renderInspector(); if (hit.im !== 0) { world.mouse = { body: hit, la: Phys.localAnchor(hit, w[0], w[1]), tx: w[0], ty: w[1] }; grabInfo = { moved: 0, x: p[0], y: p[1], body: hit }; } }
+      else { sel = null; renderInspector(); panDrag = { sx: p[0], sy: p[1], ox: view.ox, oy: view.oy }; }
+    } else if (SPAWN[t]) { aim = { x: w[0], y: w[1], sx: p[0], sy: p[1] }; }
+    else if (t === 'wall') { wallDrag = { x0: w[0], y0: w[1], x1: w[0], y1: w[1] }; }
+    else if (t === 'erase') {
+      var hj = jointAt(p[0], p[1], true), jn = null;               // a hinge circle first, then a body, then any joint line
+      if (hj) world.joints.splice(world.joints.indexOf(hj), 1);
+      else if (hit && !hit.isArena) { Phys.remove(world, hit); if (sel === hit) sel = null; renderInspector(); }
+      else { jn = jointAt(p[0], p[1]); if (jn) world.joints.splice(world.joints.indexOf(jn), 1); }
+    } else if (t === 'attract') {
+      var near = world.attractors.filter(function (a) { return Math.hypot(a.x - w[0], a.y - w[1]) < 1.2; })[0];
+      if (near) world.attractors.splice(world.attractors.indexOf(near), 1); else world.attractors.push({ x: w[0], y: w[1], gm: S.gm });
+    } else if (t === 'rod' || t === 'rope' || t === 'spring' || t === 'hinge') { linkClick(t, w, hit); }
+  });
+  function linkClick(t, w, hit) {
+    var body = hit && !hit.isArena ? hit : (hit && hit.isArena ? hit : world.ground), anchor = { body: body, wx: w[0], wy: w[1] };
+    if (!linkA) { linkA = { body: body, wx: w[0], wy: w[1] }; return; }
+    var A = linkA.body, B = body; if (A === B) { linkA = null; return; }
+    var pa = [linkA.wx, linkA.wy], pb = [w[0], w[1]];
+    if (t === 'hinge') Phys.hinge(world, A, B, pa[0], pa[1]);
+    else Phys.link(world, t, A, B, pa, pb, { hz: 2, zeta: 0.15 });
+    linkA = null;
+  }
+  cv.addEventListener('pointermove', function (e) {
+    var p = local(e), w = s2w(p[0], p[1]); ptr = { x: w[0], y: w[1], px: p[0], py: p[1], on: true };
+    if (world.mouse) { world.mouse.tx = w[0]; world.mouse.ty = w[1]; if (grabInfo) grabInfo.moved = Math.max(grabInfo.moved, Math.hypot(p[0] - grabInfo.x, p[1] - grabInfo.y)); }
+    if (wallDrag) { wallDrag.x1 = w[0]; wallDrag.y1 = w[1]; }
+    if (panDrag) { view.ox = panDrag.ox + (p[0] - panDrag.sx); view.oy = panDrag.oy + (p[1] - panDrag.sy); }
+    cv.style.cursor = S.tool === 'drag' ? (world.mouse ? 'grabbing' : (bodyAt(w[0], w[1]) ? 'grab' : 'default')) : (S.tool === 'erase' ? 'pointer' : 'crosshair');
+  });
+  function endPointer(e) {
+    var p = local(e), w = s2w(p[0], p[1]);
+    if (world.mouse) { world.mouse = null; }
+    grabInfo = null; panDrag = null;
+    if (aim) {
+      var dx = aim.x - w[0], dy = aim.y - w[1], dragged = Math.hypot(p[0] - aim.sx, p[1] - aim.sy) > 8, vx = dragged ? clamp(dx * 3, -45, 45) : 0, vy = dragged ? clamp(dy * 3, -45, 45) : 0;
+      var b = spawn(S.tool, aim.x, aim.y, vx, vy); if (b) { sel = b; renderInspector(); } aim = null;
+    }
+    if (wallDrag) {
+      var len = Math.hypot(wallDrag.x1 - wallDrag.x0, wallDrag.y1 - wallDrag.y0);
+      if (len > 0.4) { var wb = Phys.box((wallDrag.x0 + wallDrag.x1) / 2, (wallDrag.y0 + wallDrag.y1) / 2, len, 0.3, { static: true, e: S.bounce, mu: S.fric, angle: Math.atan2(wallDrag.y1 - wallDrag.y0, wallDrag.x1 - wallDrag.x0) }); addB(wb); }
+      wallDrag = null;
+    }
+  }
+  cv.addEventListener('pointerup', endPointer); cv.addEventListener('pointercancel', endPointer);
+  cv.addEventListener('pointerleave', function () { ptr.on = false; });
+  cv.addEventListener('wheel', function (e) { if (!(e.ctrlKey || e.metaKey)) return; e.preventDefault(); var p = local(e); zoomAt(p[0], p[1], e.deltaY < 0 ? 1.12 : 1 / 1.12); }, { passive: false });
+
+  /* ---------- toolbar ---------- */
+  var ICON = {
+    drag: '<path d="M8 1.5v13M1.5 8h13M8 1.5L6 3.5M8 1.5l2 2M8 14.5l-2-2M8 14.5l2-2M1.5 8l2-2M1.5 8l2 2M14.5 8l-2-2M14.5 8l-2 2"/>',
+    circle: '<circle cx="8" cy="8" r="5.2"/>', box: '<rect x="3" y="3" width="10" height="10"/>', tri: '<path d="M8 2.5l6 10.5H2z"/>', hex: '<path d="M8 1.8l5.4 3.1v6.2L8 14.2 2.6 11.1V4.9z"/>', plank: '<rect x="1.5" y="6" width="13" height="4"/>',
+    wall: '<path d="M2 13L14 3" stroke-width="2.4"/>', rod: '<circle cx="3.5" cy="12.5" r="1.7"/><circle cx="12.5" cy="3.5" r="1.7"/><path d="M4.7 11.3l6.6-6.6"/>',
+    rope: '<circle cx="3.5" cy="3.5" r="1.7"/><circle cx="12.5" cy="3.5" r="1.7"/><path d="M5 4.5q3 7 6 0" stroke-dasharray="2 2"/>', spring: '<path d="M2 8h2l1.2-3 2 6 2-6 2 6 1.2-3H14"/>', hinge: '<circle cx="8" cy="8" r="3"/><path d="M8 2v3M8 11v3"/>',
+    attract: '<circle cx="8" cy="8" r="2"/><circle cx="8" cy="8" r="5.5" stroke-dasharray="2 2.4"/>', erase: '<path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>',
+    pause: '<path d="M5.5 3v10M10.5 3v10"/>', play: '<path d="M5 3l8 5-8 5z"/>', step: '<path d="M4 3l6 5-6 5zM12 3v10"/>', fit: '<path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4"/>', plus: '<path d="M8 3v10M3 8h10"/>', minus: '<path d="M3 8h10"/>',
+    vec: '<path d="M3 13L12 4M7 4h5v5"/>', trail: '<path d="M2 12q4-8 7-2t5-6" stroke-dasharray="2 2"/>', cont: '<circle cx="8" cy="8" r="2.4" fill="currentColor"/><path d="M8 8V2"/>', walls: '<path d="M3 2v12M13 2v12"/>'
+  };
+  var TOOLS = [
+    ['drag', 'Drag', 'v'], ['circle', 'Circle', 'c'], ['box', 'Box', 'b'], ['tri', 'Triangle', 't'], ['hex', 'Hexagon', 'h'], ['plank', 'Plank', 'p'], ['wall', 'Wall', 'w'],
+    ['rod', 'Rod', 'r'], ['rope', 'Rope', 'o'], ['spring', 'Spring', 's'], ['hinge', 'Hinge', 'j'], ['attract', 'Attractor', 'a'], ['erase', 'Erase', 'x']
+  ];
+  function tb(id, label, icon, extra, attrs) { return '<button type="button" class="tool' + (extra || '') + '" ' + (attrs || '') + ' title="' + label + '" aria-label="' + label + '"><svg viewBox="0 0 16 16" aria-hidden="true">' + icon + '</svg><span class="t">' + label + '</span></button>'; }
+  $('#tools').innerHTML = TOOLS.map(function (t) { return tb(t[0], t[1] + ' (' + t[2].toUpperCase() + ')', ICON[t[0]], '', 'data-tool="' + t[0] + '" aria-pressed="' + (t[0] === 'drag') + '"').replace('<span class="t">' + t[1] + ' (' + t[2].toUpperCase() + ')</span>', '<span class="t">' + t[1] + '</span>'); }).join('') +
+    tb('tPause', 'Pause', ICON.pause, ' sep', 'id="tPause"') + tb('tStep', 'Step', ICON.step, '', 'id="tStep"') + tb('tFit', 'Fit', ICON.fit, '', 'id="tFit"') + tb('tZi', 'Zoom in', ICON.plus, '', 'id="tZi"') + tb('tZo', 'Zoom out', ICON.minus, '', 'id="tZo"') +
+    tb('tVec', 'Vectors', ICON.vec, ' sep tog', 'data-tog="vectors" aria-pressed="false"') + tb('tTrail', 'Trails', ICON.trail, ' tog', 'data-tog="trails" aria-pressed="false"') + tb('tCont', 'Contacts', ICON.cont, ' tog', 'data-tog="contacts" aria-pressed="false"') + tb('tWalls', 'Walls', ICON.walls, ' tog', 'data-tog="walls" aria-pressed="true"');
+  function setTool(id) { S.tool = id; linkA = null; aim = null; wallDrag = null; $$('[data-tool]').forEach(function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-tool') === id ? 'true' : 'false'); }); showHint(); }
+  var HINTS = { drag: 'Drag objects to throw them. Click one to inspect it. Drag empty space to pan.', circle: 'Click to drop a circle. Click and drag back to aim and launch it.', box: 'Click to drop a box. Click and drag back to aim and launch it.', tri: 'Click to drop a triangle. Drag back to launch it.', hex: 'Click to drop a hexagon. Drag back to launch it.', plank: 'Click to drop a plank. Drag back to launch it.', wall: 'Drag to draw a fixed wall or ramp.', rod: 'Click two points to join them with a rigid rod. Click empty space to anchor to the world.', rope: 'Click two points to join them with a rope that only pulls.', spring: 'Click two points to join them with a spring.', hinge: 'Click a pivot point, then the second body (or empty space to pin to the world).', attract: 'Click to place a gravity well. Click it again to remove it.', erase: 'Click an object or a joint to delete it.' };
+  function showHint() { if (!sel) $('#inspect').textContent = HINTS[S.tool] || ''; }
+  $('#tools').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    if (b.hasAttribute('data-tool')) { setTool(b.getAttribute('data-tool')); return; }
+    if (b.hasAttribute('data-tog')) { var k = b.getAttribute('data-tog'); S[k] = !S[k]; b.setAttribute('aria-pressed', String(S[k])); if (k === 'walls') buildArena(); return; }
+    if (b.id === 'tPause') togglePause(); else if (b.id === 'tStep') { if (!S.paused) togglePause(); Phys.step(world, 1 / 60); record(); }
+    else if (b.id === 'tFit') fitView(); else if (b.id === 'tZi') zoomAt(T.w / 2, T.h / 2, 1.25); else if (b.id === 'tZo') zoomAt(T.w / 2, T.h / 2, 1 / 1.25);
+  });
+  function togglePause() { S.paused = !S.paused; var b = $('#tPause'); b.querySelector('.t').textContent = S.paused ? 'Play' : 'Pause'; b.querySelector('svg').innerHTML = S.paused ? ICON.play : ICON.pause; }
+  function syncPressed() { $$('#scenes .btn').forEach(function (b) { b.setAttribute('aria-pressed', String(b.textContent === sceneName)); }); }
+  document.addEventListener('keydown', function (e) {
+    var t = e.target; if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return; var k = e.key.toLowerCase();
+    if (k === ' ' && (!t || t.tagName !== 'BUTTON')) { e.preventDefault(); togglePause(); return; }
+    var tl = TOOLS.filter(function (x) { return x[2] === k; })[0]; if (tl) { setTool(tl[0]); return; }
+    if (k === 'f') fitView(); else if (k === '.') { if (!S.paused) togglePause(); Phys.step(world, 1 / 60); } else if (k === 'escape') { linkA = null; sel = null; renderInspector(); }
+    else if ((k === 'delete' || k === 'backspace') && sel && !sel.isArena) { Phys.remove(world, sel); sel = null; renderInspector(); }
+  });
+
+  /* ---------- controls ---------- */
+  var CT = [
+    { k: 'g', label: 'Gravity (m/s\u00b2)', min: -20, max: 30, step: 0.01, dec: 2, apply: function (v) { S.g = v; world.gy = -v; } },
+    { k: 'ts', label: 'Time scale', min: 0.05, max: 2, step: 0.01, dec: 2 },
+    { k: 'bounce', label: 'Bounciness of new objects', min: 0, max: 1, step: 0.01, dec: 2 },
+    { k: 'fric', label: 'Friction of new objects', min: 0, max: 1.2, step: 0.01, dec: 2 },
+    { k: 'size', label: 'Size of new objects (m)', min: 0.3, max: 2.5, step: 0.05, dec: 2 }
+  ];
+  var form = $('#controls');
+  CT.forEach(function (c) {
+    var row = document.createElement('div'); row.className = 'ctl';
+    row.innerHTML = '<div class="ctl-top"><label for="n-' + c.k + '">' + c.label + '</label><input class="num" id="n-' + c.k + '" type="text" inputmode="decimal"></div><input class="rng" id="r-' + c.k + '" type="range" min="' + c.min + '" max="' + c.max + '" step="' + c.step + '" aria-label="' + c.label + '">';
+    form.appendChild(row); c.num = row.querySelector('.num'); c.rng = row.querySelector('.rng');
+    function apply(v) { S[c.k] = v; if (c.apply) c.apply(v); }
+    c.rng.addEventListener('input', function () { apply(+c.rng.value); syncCtl(c.k); });
+    c.num.addEventListener('change', function () { var v = parseFloat(String(c.num.value).replace(/,/g, '')); if (isFinite(v)) apply(clamp(v, c.min, c.max)); syncCtl(); });
+  });
+  function syncCtl(skip) { CT.forEach(function (c) { if (c.k !== skip) c.rng.value = S[c.k]; c.num.value = S[c.k].toFixed(c.dec); }); }
+  var GPRE = [['Moon', 1.62], ['Mars', 3.71], ['Earth', 9.81], ['Jupiter', 24.79], ['Zero-g', 0]];
+  GPRE.forEach(function (g) { var b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = g[0]; b.addEventListener('click', function () { S.g = g[1]; world.gy = -g[1]; syncCtl(); }); $('#gpre').appendChild(b); });
+  SCENES.forEach(function (sc) { var b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = sc.name; b.setAttribute('aria-pressed', 'false'); b.addEventListener('click', function () { loadScene(sc.name); }); $('#scenes').appendChild(b); });
+  $('#bReset').addEventListener('click', function () { if (sceneName === 'Empty') clearAll(); else loadScene(sceneName); });
+  $('#bClear').addEventListener('click', function () { clearAll(); syncPressed(); });
+
+  /* ---------- inspector ---------- */
+  var inspectEl = $('#inspect');
+  function kindOf(b) { return b.shape.type === 'circle' ? 'Circle' : (b.shape.v.length === 4 ? 'Box' : b.shape.v.length + '-gon'); }
+  function renderInspector() {
+    if (!sel || world.bodies.indexOf(sel) < 0) { sel = null; inspectEl.textContent = HINTS[S.tool] || ''; return; }
+    var b = sel;
+    inspectEl.innerHTML = '<div class="row"><b>' + kindOf(b) + ' #' + b.id + (b.im === 0 ? ' (fixed)' : '') + '</b><span class="live" id="iLive"></span></div>' +
+      (b.isArena ? '<div class="row"><span>Part of the arena</span></div>' :
+      '<div class="row"><span>Mass (kg)</span><input class="num" id="iM" type="text" inputmode="decimal" value="' + b.m0.toFixed(2) + '"></div>' +
+      '<div class="row"><span>Bounciness</span><input class="rng" id="iE" type="range" min="0" max="1" step="0.01" value="' + b.e + '" aria-label="Bounciness"></div>' +
+      '<div class="row"><span>Friction</span><input class="rng" id="iMu" type="range" min="0" max="1.2" step="0.01" value="' + b.mu + '" aria-label="Friction"></div>' +
+      '<div class="row"><span>Fixed in place</span><input type="checkbox" id="iS"' + (b.im === 0 ? ' checked' : '') + ' aria-label="Fixed in place"></div>' +
+      '<button type="button" class="btn" id="iDel">Delete</button>');
+    if (b.isArena) return;
+    $('#iM').addEventListener('change', function () { var v = parseFloat(this.value); if (v > 0) Phys.setMass(b, clamp(v, 0.01, 5000)); renderInspector(); });
+    $('#iE').addEventListener('input', function () { b.e = +this.value; }); $('#iMu').addEventListener('input', function () { b.mu = +this.value; });
+    $('#iS').addEventListener('change', function () { Phys.setStatic(b, this.checked); renderInspector(); });
+    $('#iDel').addEventListener('click', function () { Phys.remove(world, b); sel = null; renderInspector(); });
+  }
+
+  /* ---------- readouts, charts ---------- */
+  function record() { var en = Phys.energy(world); enHist.push([world.time, en.K, en.P, en.E, en.p]); if (enHist.length > 420) enHist.shift(); }
   function updateHud() {
-    $('h-world').textContent = WORLDS[world].name + ' · g ' + P.g.toFixed(2);
-    const sh = shots[shots.length - 1];
-    if (!sh) {
-      $('h-t').textContent = '0.00 s'; $('h-x').textContent = '0.0 m';
-      $('h-y').textContent = P.h.toFixed(1) + ' m'; $('h-v').textContent = P.v.toFixed(1) + ' m/s';
-      return;
+    var en = Phys.energy(world), n = world.bodies.filter(function (b) { return !b.isArena; }).length;
+    $('#hN').textContent = n; $('#hK').textContent = fN(en.K, 1) + ' J'; $('#hP').textContent = fN(en.P, 1) + ' J'; $('#hT').textContent = fN(en.E, 1) + ' J'; $('#hM').textContent = fN(en.p, 1) + ' kg\u00b7m/s';
+    if (sel && world.bodies.indexOf(sel) >= 0 && $('#iLive')) $('#iLive').textContent = fN(Math.hypot(sel.vx, sel.vy), 2) + ' m/s';
+  }
+  function chartSetup(id) {
+    var el = $('#' + id), r = el.getBoundingClientRect(), w = Math.round(r.width), h = Math.round(r.height); if (w < 10 || h < 10) return null;
+    var dpr = Math.min(window.devicePixelRatio || 1, 2); if (el.width !== Math.round(w * dpr) || el.height !== Math.round(h * dpr)) { el.width = Math.round(w * dpr); el.height = Math.round(h * dpr); }
+    var c = el.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, w, h); return { c: c, w: w, h: h };
+  }
+  function ticks(min, max, n) { var span = max - min || 1, raw = span / n, mag = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / mag, s = f < 1.5 ? 1 : (f < 3.5 ? 2 : (f < 7.5 ? 5 : 10)), step = s * mag, o = [], v = Math.ceil(min / step) * step; while (v <= max + 1e-9) { o.push(v); v += step; } return o; }
+  function lineChart(id, series, unit) {
+    var g = chartSetup(id); if (!g) return; var c = g.c, w = g.w, h = g.h, PL = 56, PR = 14, PT = 34, PB = 26, i, mn = 0, mx = 1e-9;
+    var t1 = enHist.length ? enHist[enHist.length - 1][0] : 0, t0 = Math.max(0, t1 - 20);
+    var data = enHist.filter(function (d) { return d[0] >= t0; });
+    series.forEach(function (s) { data.forEach(function (d) { mn = Math.min(mn, d[s.i]); mx = Math.max(mx, d[s.i]); }); });
+    var span = (mx - mn) * 1.12 || 1; mx = mn + span;
+    function X(t) { return PL + (t - t0) / Math.max(20, t1 - t0 || 20) * (w - PL - PR); } function Y(v) { return PT + (1 - (v - mn) / (mx - mn)) * (h - PT - PB); }
+    c.lineWidth = 1; c.strokeStyle = W(.08); c.beginPath(); ticks(mn, mx, 4).forEach(function (v) { c.moveTo(PL, Y(v)); c.lineTo(w - PR, Y(v)); }); c.stroke();
+    c.strokeStyle = W(.3); c.beginPath(); c.moveTo(PL, PT); c.lineTo(PL, h - PB); c.lineTo(w - PR, h - PB); c.stroke();
+    ticks(mn, mx, 4).forEach(function (v) { txt(c, fN(v, Math.abs(v) >= 100 ? 0 : 1), PL - 8, Y(v) + 3, 9, W(.4), 'right'); });
+    txt(c, 'time (s)', w - PR, h - 8, 9, W(.35), 'right'); txt(c, unit, PL - 8, PT - 10, 9, W(.35), 'right');
+    if (mn < 0 && mx > 0) { c.strokeStyle = W(.3); c.setLineDash([3, 4]); c.beginPath(); c.moveTo(PL, Y(0)); c.lineTo(w - PR, Y(0)); c.stroke(); c.setLineDash([]); }
+    series.forEach(function (s) { c.strokeStyle = s.col; c.lineWidth = s.w; c.beginPath(); data.forEach(function (d, k) { if (k === 0) c.moveTo(X(d[0]), Y(d[s.i])); else c.lineTo(X(d[0]), Y(d[s.i])); }); c.stroke(); });
+    if (!data.length) txt(c, 'Drop something in the sandbox to start recording.', PL + 10, PT + 16, 10, W(.5));
+  }
+  function updateCharts() { lineChart('chE', [{ i: 2, col: W(.4), w: 1.6 }, { i: 1, col: '#ffffff', w: 1.8 }, { i: 3, col: 'rgb(255,79,46)', w: 2.2 }], 'J'); lineChart('chP', [{ i: 4, col: '#ffffff', w: 2 }], 'kg\u00b7m/s'); }
+
+  /* ---------- loop ---------- */
+  var hudAt = 0, chAt = 0, acc = 0, telVisible = false;
+  function tick(now) {
+    requestAnimationFrame(tick);
+    var dt = lastT ? Math.min(.05, (now - lastT) / 1000) : .016; lastT = now;
+    if (!S.paused && visible) {
+      var d = Math.min(dt * S.ts, 1 / 30); if (d > 0) { Phys.step(world, d); enT += d; if (enT >= 0.1) { enT = 0; record(); } }
+      world.events.forEach(function (ev) { effects.push({ x: ev.x, y: ev.y, imp: ev.imp, t: now }); }); if (effects.length > 60) effects.splice(0, effects.length - 60);
+      if (S.trails) world.bodies.forEach(function (b) { if (b.im !== 0) { b.trail.push([b.x, b.y]); if (b.trail.length > 70) b.trail.shift(); } }); else world.bodies.forEach(function (b) { if (b.trail.length) b.trail.length = 0; });
     }
-    $('h-t').textContent = fmtTime(sh.t);
-    $('h-x').textContent = fmtDist(sh.s.x);
-    $('h-y').textContent = fmtDist(Math.max(sh.s.y, 0));
-    $('h-v').textContent = Math.hypot(sh.s.vx, sh.s.vy).toFixed(1) + ' m/s';
+    if (visible) draw(dt, now);
+    if (now - hudAt > 120) { hudAt = now; updateHud(); }
+    if (telVisible && now - chAt > 200) { chAt = now; updateCharts(); }
   }
 
-  /* ---------- Loop ---------- */
-  let last = performance.now();
-  function frame(now) {
-    const dt = Math.min(0.05, (now - last) / 1000);
-    last = now;
-    if (dirty) refresh();
-    advance(dt * P.s);
-    draw();
-    requestAnimationFrame(frame);
-  }
+  /* ---------- start-up ---------- */
+  resize(); if (window.ResizeObserver) new ResizeObserver(resize).observe(stage); else window.addEventListener('resize', resize);
+  buildArena(); syncCtl(); loadScene('Pyramid'); renderInspector(); showHint();
+  window.SandboxLab = {
+    P: Phys, S: S, world: function () { return world; }, step: function (t, dt) { dt = dt || 1 / 60; var n = Math.round(t / dt), i; for (i = 0; i < n; i++) Phys.step(world, dt); }, add: addB, clearAll: clearAll, loadScene: loadScene, mat: mat,
+    w2s: w2s, s2w: s2w, view: view, setTool: setTool, sel: function () { return sel; }, record: record, hist: function () { return enHist; }, scenes: SCENES, arena: buildArena, spawn: spawn, setSel: function (b) { sel = b; renderInspector(); }
+  };
+  requestAnimationFrame(tick);
 
-  /* ---------- Init ---------- */
-  CONTROLS.forEach(c => setParam(c.id, c.val, false));
-  setWorld('earth');
-  refresh();
-  resize();
-  launch();
-  requestAnimationFrame(frame);
+  var slides = $$('[data-slide]');
+  function setActive(i) {
+    $$('[data-rail]').forEach(function (a) { var on = +a.getAttribute('data-rail') === i; a.classList.toggle('is-active', on); if (on) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current'); });
+    $$('[data-nav]').forEach(function (a) { a.classList.toggle('is-active', +a.getAttribute('data-nav') === i); });
+  }
+  function onScroll() {
+    document.documentElement.classList.toggle('is-top', window.scrollY < 40);
+    var vh = window.innerHeight, cur = 0; slides.forEach(function (s, i) { var r = s.getBoundingClientRect(); if (r.top <= vh * .5 && r.bottom > vh * .5) cur = i; }); setActive(cur);
+  }
+  window.addEventListener('scroll', onScroll, { passive: true }); onScroll();
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver(function (es) { visible = es[0].isIntersecting; }, { rootMargin: '8% 0px' }).observe($('#sandbox'));
+    new IntersectionObserver(function (es) { telVisible = es[0].isIntersecting; if (telVisible) updateCharts(); }, { rootMargin: '8% 0px' }).observe($('#energy'));
+  }
+  if ('IntersectionObserver' in window && !REDUCED) {
+    var io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }); }, { threshold: .2 });
+    slides.forEach(function (s) { io.observe(s); });
+    var fr = (document.fonts && document.fonts.ready) ? Promise.race([document.fonts.ready, new Promise(function (r) { setTimeout(r, 1500); })]) : Promise.resolve();
+    fr.then(function () { requestAnimationFrame(function () { $('#sandbox').classList.add('in'); }); });
+  } else { slides.forEach(function (s) { s.classList.add('in'); }); }
 })();
 </script>
 </body>
